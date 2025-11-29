@@ -1,0 +1,15 @@
+change_amount = ""
+change_blinding = ""
+change_commitment = ""
+change_pub_key = ""
+in_amount = ""
+in_asset_id = ""
+in_blinding = ""
+in_path = ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+in_priv_key = ""
+in_siblings = ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+merkle_root = ""
+nullifier = ""
+recipient = ""
+relayer_fee = ""
+withdraw_amount = ""
