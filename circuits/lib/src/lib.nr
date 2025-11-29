@@ -14,10 +14,10 @@ pub fn hash_4(a: Field, b: Field, c: Field, d: Field) -> Field {
 
 // The Core Data Structure: A Private Note
 pub struct Note {
-    amount: Field,
-    asset_id: Field,     // Address of the token (ETH/USDC)
-    blinding: Field,     // Randomness
-    owner_key: Field     // User's private key derivative
+    pub amount: Field,
+    pub asset_id: Field,     // Address of the token (ETH/USDC)
+    pub blinding: Field,     // Randomness
+    pub owner_key: Field     // User's private key derivative
 }
 
 impl Note {
