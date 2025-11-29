@@ -1,6 +1,7 @@
 [package]
-name = "transact"
+name = "shieldnet_transact"
 type = "bin"
-authors = [""]
+authors = ["Saurabh"]
 
 [dependencies]
+shieldnet_lib = { path = "../lib" }
