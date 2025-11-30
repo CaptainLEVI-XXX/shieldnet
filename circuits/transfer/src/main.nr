@@ -1,4 +1,4 @@
-use shieldnet_lib::{Note, verify_merkle_path};
+use dep::shieldnet_lib::{Note, verify_merkle_path};
 
 fn main(
     // Private Input (Just 1 note for simplicity)
