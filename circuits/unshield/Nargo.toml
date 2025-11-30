@@ -1,5 +1,5 @@
 [package]
-name = "shieldnet_unshield"
+name = "unshield"
 type = "bin"
 authors = ["Saurabh"]
 

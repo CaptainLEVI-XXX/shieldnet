@@ -1,5 +1,5 @@
 [package]
-name = "shieldnet_transfer"
+name = "transfer"
 type = "bin"
 authors = ["Saurabh"]
 

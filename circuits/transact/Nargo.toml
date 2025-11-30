@@ -1,5 +1,5 @@
 [package]
-name = "shieldnet_transact"
+name = "transact"
 type = "bin"
 authors = ["Saurabh"]
 
