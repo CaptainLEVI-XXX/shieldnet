@@ -1,0 +1,5 @@
+scripts/.env
+node_modules
+verifier_transfer/target
+verifier_transact/target
+verifier_unshield/target

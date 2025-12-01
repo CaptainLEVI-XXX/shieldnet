@@ -1,0 +1,17 @@
+Starknet Sepolia Deployment Info: 
+
+ShieldNet:
+Contract deployed at: 0x4520042635cb0d4c9e1890c92b67837c9c6a710b94bab86f71546887a33bd6c
+Class hash: 0x5415e41504db4bcd092e38d333942630fd37314f87793dc1650489ee3de499d
+
+verifier_transfer: 
+Contract deployed at: 0x62fa63ede6cf9bdc6767d2ba32cb4e318e847ea63eb3d802ce24c8b3407985b
+Class hash: 0x655056f80f8dc332f74b4e89e40ccd720810760b5423abebdd41d93ab2f5c45
+
+verifier_transact: 
+Contract deployed at: 0x4d147dd7d532464735276fd2863b8181c22e5580c2bdcda008d0012ad783180
+Class hash: 0x22811e47994563d6bb2d383d89d5ddc75375ea5fde91bb19e73f5bb1d77e114
+
+verifier_unshield...
+Contract deployed at: 0x1818b58666f829a2c802fbfe4ea4fb0d7e7397d8838fbe5d029f1cdbec6b89e
+Class hash: 0x16ab2805a5459588c6145dc9fcfa302a0208bf347471bcda9b443ba0e0dacb5
