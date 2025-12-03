@@ -43,14 +43,14 @@ export function NotesPanel({ wallet, shieldNet }: Props) {
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2 text-sm text-slate-400">
             <Key className="w-4 h-4" />
-            Your Public Key
+            Your ShieldNet Public Key
           </div>
           <button onClick={copyKey} className="text-green-500 hover:text-green-400">
             {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
           </button>
         </div>
         <div className="font-mono text-xs bg-slate-900 rounded p-2 break-all text-slate-300">
-          0x{shieldNet.publicKey.toString(16).slice(0, 20)}...
+          0x{shieldNet.publicKey.toString(16)}
         </div>
       </div>
 
@@ -63,22 +63,18 @@ export function NotesPanel({ wallet, shieldNet }: Props) {
         <h3 className="font-semibold mb-3 text-white">Notes ({unspent.length} unspent)</h3>
         {shieldNet.notes.length === 0 ? (
           <div className="text-center py-8 bg-slate-800 rounded-xl text-slate-400">
-            No notes yet
+            No notes yet. Deposit tokens to create your first note.
           </div>
         ) : (
           <div className="space-y-2">
             {shieldNet.notes.map((note, i) => (
               <div
                 key={i}
-                className={`p-4 rounded-xl border ${
-                  note.spent ? 'bg-slate-900 border-slate-700 opacity-50' : 'bg-slate-800 border-slate-600'
-                }`}
+                className={`p-4 rounded-xl border ${note.spent ? 'bg-slate-900 border-slate-700 opacity-50' : 'bg-slate-800 border-slate-600'}`}
               >
                 <div className="flex justify-between items-center">
                   <span className="font-semibold text-white">{formatUnits(note.amount, 18)} STRK</span>
-                  <span className={`text-xs px-2 py-1 rounded ${
-                    note.spent ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'
-                  }`}>
+                  <span className={`text-xs px-2 py-1 rounded ${note.spent ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>
                     {note.spent ? 'Spent' : 'Available'}
                   </span>
                 </div>

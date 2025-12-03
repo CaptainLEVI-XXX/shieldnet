@@ -1,15 +1,25 @@
-change_amount = ""
-change_blinding = ""
-change_commitment = ""
-change_pub_key = ""
-in_amount = ""
-in_asset_id = ""
-in_blinding = ""
-in_path = ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
-in_priv_key = ""
-in_siblings = ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
-merkle_root = ""
-nullifier = ""
-recipient = ""
-relayer_fee = ""
-withdraw_amount = ""
+in1_amount = "0x29a2241af62c0000"
+in1_asset_id = "0x4718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d"
+in1_blinding = "0x4f349c6eff27c6808a39a7cc44740325e526a2557085c785cea9f41815b3c4"
+in1_priv_key = "0x92b6d245df0d5631e3043c4c433cba7aafbd40421924492cde650c13167337"
+in1_path = ["0x0", "0x0", "0x0", "0x0", "0x0"]
+in1_siblings = ["0x0", "0x98f5fb9e239eab3ceac3f27b81e481dc3124d55ffed523a839ee8446b64864", "0x1ec4aba07d944df7aa1e29bc1be04d7fb77047fb19235d4b439546ae0a4d72", "0x7a6846fbb577a3ee2779107c63ed46d968ff19361a3f49367a9f7c57681c967", "0x33763c538435e18c580794eb8c5d4cf3da3bb851df11987c0c510a73fa77d25"]
+
+in2_amount = "0x0"
+in2_asset_id = "0x4718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d"
+in2_blinding = "0x1"
+in2_priv_key = "0x92b6d245df0d5631e3043c4c433cba7aafbd40421924492cde650c13167337"
+in2_path = ["0x0", "0x0", "0x0", "0x0", "0x0"]
+in2_siblings = ["0x0", "0x98f5fb9e239eab3ceac3f27b81e481dc3124d55ffed523a839ee8446b64864", "0x1ec4aba07d944df7aa1e29bc1be04d7fb77047fb19235d4b439546ae0a4d72", "0x7a6846fbb577a3ee2779107c63ed46d968ff19361a3f49367a9f7c57681c967", "0x33763c538435e18c580794eb8c5d4cf3da3bb851df11987c0c510a73fa77d25"]
+
+change_amount = "0x0"
+change_blinding = "0x1"
+change_pub_key = "0x1"
+
+merkle_root = "0x5c514b990816f3220e30af976b6cb1fd72276df15502ed2b12bbd5fc792fc98"
+nullifier_1 = "0x1"  
+nullifier_2 = "0x0"
+change_commitment = "0x1"
+recipient = "0x1234"
+withdraw_amount = "0x29a2241af62c0000"
+relayer_fee = "0x0"

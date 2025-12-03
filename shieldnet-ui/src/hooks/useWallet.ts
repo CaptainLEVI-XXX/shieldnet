@@ -1,33 +1,21 @@
 import { useState, useCallback } from 'react'
 import { connect, disconnect } from '@starknet-io/get-starknet'
-import type { WalletState } from '../types'
 
 export function useWallet() {
-  const [wallet, setWallet] = useState<WalletState>({
-    address: null,
-    isConnected: false,
-  })
-  const [account, setAccount] = useState<any>(null)
+  const [address, setAddress] = useState<string | null>(null)
+  const [isConnected, setIsConnected] = useState(false)
+  const [wallet, setWallet] = useState<any>(null)
 
   const connectWallet = useCallback(async () => {
     try {
       const starknet = await connect()
       if (!starknet) throw new Error('No wallet found')
       
-      // v4 API - request permissions
-      const result = await starknet.request({ type: 'wallet_requestAccounts' })
-      const address = result[0]
+      const accounts = await starknet.request({ type: 'wallet_requestAccounts' })
       
-      // Get account from wallet
-      const walletAccount = await starknet.request({ type: 'wallet_requestAccounts' })
-      
-      setWallet({
-        address: address || null,
-        isConnected: true,
-      })
-      
-      // Store the starknet object for later use
-      setAccount(starknet)
+      setAddress(accounts[0] || null)
+      setIsConnected(true)
+      setWallet(starknet)
       
       return starknet
     } catch (err) {
@@ -38,13 +26,15 @@ export function useWallet() {
 
   const disconnectWallet = useCallback(async () => {
     await disconnect()
-    setWallet({ address: null, isConnected: false })
-    setAccount(null)
+    setAddress(null)
+    setIsConnected(false)
+    setWallet(null)
   }, [])
 
   return {
-    ...wallet,
-    account,
+    address,
+    isConnected,
+    wallet,
     connect: connectWallet,
     disconnect: disconnectWallet,
   }

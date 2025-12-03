@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { ArrowUpFromLine, Shield } from 'lucide-react'
-import { formatUnits } from '../../lib/utils'
+import { ArrowUpFromLine, Shield, Loader2, AlertCircle, CheckCircle } from 'lucide-react'
+import { parseUnits, formatUnits } from '../../lib/utils'
 
 interface Props {
   wallet: { isConnected: boolean; address: string | null }
   shieldNet: {
+    withdraw: (amount: bigint, recipient: string) => Promise<string>
+    txState: { status: string; message: string; error?: string }
     getShieldedBalance: () => bigint
     getUnspentNotes: () => any[]
   }
@@ -14,6 +16,12 @@ export function WithdrawPanel({ wallet, shieldNet }: Props) {
   const [amount, setAmount] = useState('')
   const [recipient, setRecipient] = useState('')
 
+  const handleWithdraw = async () => {
+    if (!amount || !recipient) return
+    await shieldNet.withdraw(parseUnits(amount, 18), recipient)
+    setAmount('')
+  }
+
   if (!wallet.isConnected) {
     return (
       <div className="text-center py-12">
@@ -22,6 +30,9 @@ export function WithdrawPanel({ wallet, shieldNet }: Props) {
       </div>
     )
   }
+
+  const { txState } = shieldNet
+  const isLoading = ['generating_witness', 'generating_proof', 'preparing_calldata', 'submitting'].includes(txState.status)
 
   return (
     <div className="space-y-6">
@@ -51,7 +62,7 @@ export function WithdrawPanel({ wallet, shieldNet }: Props) {
       </div>
 
       <div>
-        <label className="block text-sm text-slate-400 mb-2">Recipient</label>
+        <label className="block text-sm text-slate-400 mb-2">Recipient Address</label>
         <input
           type="text"
           value={recipient}
@@ -59,24 +70,31 @@ export function WithdrawPanel({ wallet, shieldNet }: Props) {
           placeholder="0x..."
           className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 font-mono text-sm text-white focus:outline-none focus:border-green-500"
         />
-        <button
-          onClick={() => setRecipient(wallet.address || '')}
-          className="text-sm text-green-500 hover:text-green-400 mt-2"
-        >
+        <button onClick={() => setRecipient(wallet.address || '')} className="text-sm text-green-500 hover:text-green-400 mt-2">
           Use my address
         </button>
       </div>
 
+      {txState.status !== 'idle' && (
+        <div className={`flex items-center gap-3 p-4 rounded-xl ${
+          txState.status === 'error' ? 'bg-red-500/10 text-red-400' :
+          txState.status === 'confirmed' ? 'bg-green-500/10 text-green-400' :
+          'bg-slate-800 text-white'
+        }`}>
+          {txState.status === 'error' && <AlertCircle className="w-5 h-5" />}
+          {txState.status === 'confirmed' && <CheckCircle className="w-5 h-5" />}
+          {isLoading && <Loader2 className="w-5 h-5 animate-spin" />}
+          <span>{txState.message}</span>
+        </div>
+      )}
+
       <button
-        disabled={!amount || !recipient}
+        onClick={handleWithdraw}
+        disabled={!amount || !recipient || isLoading}
         className="w-full py-4 rounded-xl bg-green-600 hover:bg-green-500 disabled:bg-slate-700 disabled:text-slate-500 font-semibold text-white"
       >
-        Unshield Tokens
+        {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Unshield Tokens'}
       </button>
-
-      <p className="text-sm text-yellow-400/80 text-center">
-        ⚠️ Requires compiled ZK circuits
-      </p>
     </div>
   )
 }

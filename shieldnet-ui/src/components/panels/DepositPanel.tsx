@@ -6,7 +6,7 @@ interface Props {
   wallet: { isConnected: boolean }
   shieldNet: {
     deposit: (amount: bigint) => Promise<any>
-    txState: { status: string; message: string }
+    txState: { status: string; message: string; error?: string }
     getShieldedBalance: () => bigint
   }
 }
@@ -16,12 +16,8 @@ export function DepositPanel({ wallet, shieldNet }: Props) {
 
   const handleDeposit = async () => {
     if (!amount) return
-    try {
-      await shieldNet.deposit(parseUnits(amount, 18))
-      setAmount('')
-    } catch (e) {
-      console.error(e)
-    }
+    await shieldNet.deposit(parseUnits(amount, 18))
+    setAmount('')
   }
 
   if (!wallet.isConnected) {
@@ -34,6 +30,7 @@ export function DepositPanel({ wallet, shieldNet }: Props) {
   }
 
   const { txState } = shieldNet
+  const isLoading = ['approving', 'submitting'].includes(txState.status)
 
   return (
     <div className="space-y-6">
@@ -67,26 +64,19 @@ export function DepositPanel({ wallet, shieldNet }: Props) {
           txState.status === 'confirmed' ? 'bg-green-500/10 text-green-400' :
           'bg-slate-800 text-white'
         }`}>
-          {txState.status === 'error' ? <AlertCircle className="w-5 h-5" /> :
-           txState.status === 'confirmed' ? <CheckCircle className="w-5 h-5" /> :
-           <Loader2 className="w-5 h-5 animate-spin" />}
+          {txState.status === 'error' && <AlertCircle className="w-5 h-5" />}
+          {txState.status === 'confirmed' && <CheckCircle className="w-5 h-5" />}
+          {isLoading && <Loader2 className="w-5 h-5 animate-spin" />}
           <span>{txState.message}</span>
         </div>
       )}
 
       <button
         onClick={handleDeposit}
-        disabled={!amount || txState.status === 'approving' || txState.status === 'submitting'}
+        disabled={!amount || isLoading}
         className="w-full py-4 rounded-xl bg-green-600 hover:bg-green-500 disabled:bg-slate-700 disabled:text-slate-500 font-semibold text-white"
       >
-        {txState.status === 'approving' || txState.status === 'submitting' ? (
-          <span className="flex items-center justify-center gap-2">
-            <Loader2 className="w-5 h-5 animate-spin" />
-            {txState.message}
-          </span>
-        ) : (
-          'Shield Tokens'
-        )}
+        {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Shield Tokens'}
       </button>
     </div>
   )

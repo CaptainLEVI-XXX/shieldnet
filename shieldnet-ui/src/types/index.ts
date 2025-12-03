@@ -22,16 +22,19 @@ export interface SerializedNote {
   createdAt: number
 }
 
-export type TxStatus = 'idle' | 'connecting' | 'approving' | 'proving' | 'submitting' | 'confirmed' | 'error'
+export type TxStatus = 
+  | 'idle' 
+  | 'approving' 
+  | 'generating_witness' 
+  | 'generating_proof' 
+  | 'preparing_calldata' 
+  | 'submitting' 
+  | 'confirmed' 
+  | 'error'
 
 export interface TxState {
   status: TxStatus
   message: string
   txHash?: string
   error?: string
-}
-
-export interface WalletState {
-  address: string | null
-  isConnected: boolean
 }

@@ -24,18 +24,12 @@ export function Header({ wallet }: Props) {
             <div className="px-3 py-2 rounded-lg bg-slate-800 text-sm font-mono text-white">
               {truncateAddress(wallet.address)}
             </div>
-            <button
-              onClick={wallet.disconnect}
-              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white"
-            >
+            <button onClick={wallet.disconnect} className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white">
               <LogOut className="w-5 h-5" />
             </button>
           </div>
         ) : (
-          <button
-            onClick={wallet.connect}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 font-medium text-white"
-          >
+          <button onClick={wallet.connect} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 font-medium text-white">
             <Wallet className="w-5 h-5" />
             Connect
           </button>

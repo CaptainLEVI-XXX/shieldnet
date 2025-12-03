@@ -6,8 +6,8 @@ fn main(
     in_asset_id: Field,
     in_blinding: Field,
     in_priv_key: Field,
-    in_path: [Field; 20],
-    in_siblings: [Field; 20],
+    in_path: [Field; 2],
+    in_siblings: [Field; 2],
 
     // Private Output (Change back to self)
     change_amount: Field,

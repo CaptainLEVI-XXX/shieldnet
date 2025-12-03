@@ -1,17 +1,36 @@
 Starknet Sepolia Deployment Info: 
 
 ShieldNet:
-Contract deployed at: 0x4520042635cb0d4c9e1890c92b67837c9c6a710b94bab86f71546887a33bd6c
+depth =
+Contract deployed at: 0x6582ba9fe8f7d2aa18298c3f1803cf3e8e4efde5282bba8abac3606f12559ad
 Class hash: 0x5415e41504db4bcd092e38d333942630fd37314f87793dc1650489ee3de499d
 
-verifier_transfer: 
-Contract deployed at: 0x62fa63ede6cf9bdc6767d2ba32cb4e318e847ea63eb3d802ce24c8b3407985b
-Class hash: 0x655056f80f8dc332f74b4e89e40ccd720810760b5423abebdd41d93ab2f5c45
 
-verifier_transact: 
-Contract deployed at: 0x4d147dd7d532464735276fd2863b8181c22e5580c2bdcda008d0012ad783180
-Class hash: 0x22811e47994563d6bb2d383d89d5ddc75375ea5fde91bb19e73f5bb1d77e114
+verifier_transfer
+Contract deployed at: 0x208601b7cb7e23a32d2856f1df1b272c054c08964558f5d104839f456ab090
+Class hash: 0x476b4fa74aa8b8ffab9d98c999ff88130c905139eeca3dcb64beebaf77e7483
+
+verifier_transact...
+Contract deployed at: 0x506b6031b6f6a55ab4d417671d7f4051c42ce8c023f976b382d2e099a1087bc
+Class hash: 0x28b78eb7e239cc42a3794208cdcd30013a4e96bc9842adf076555b7e9702088
 
 verifier_unshield...
-Contract deployed at: 0x1818b58666f829a2c802fbfe4ea4fb0d7e7397d8838fbe5d029f1cdbec6b89e
-Class hash: 0x16ab2805a5459588c6145dc9fcfa302a0208bf347471bcda9b443ba0e0dacb5
+Contract deployed at: 0x7aa6b260fa830fee4b98cbf14d422ea9357f885026712f853a341b2f3c355c5
+Class hash: 0x7fc3315e98b5afc67ae80c0e29b4f96341f505a8b4af4ff2d04ef3c4219db6f
+
+
+
+depth 20
+Contract deployed at: 0x3e8b8ac9e193dff4c508de6eaa7cef3b42b9dad3f040ee6fc8aa5d386c6850b
+Class hash: 0x5415e41504db4bcd092e38d333942630fd37314f87793dc1650489ee3de499d
+
+
+ mkdir -p public/circuits           
+
+cp ~/desktop/shieldnet/circuits/transfer/target/transfer.json public/circuits/
+cp ~/desktop/shieldnet/circuits/unshield/target/unshield.json public/circuits/
+cp ~/desktop/shieldnet/circuits/transact/target/transact.json public/circuits/
+
+cp ~/desktop/shieldnet/circuits/transfer/target/vk public/circuits/transfer_vk.bin
+cp ~/desktop/shieldnet/circuits/unshield/target/vk public/circuits/unshield_vk.bin
+cp ~/desktop/shieldnet/circuits/transact/target/vk public/circuits/transact_vk.bin

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useWallet } from './hooks/useWallet'
 import { useShieldNet } from './hooks/useShieldNet'
 import { Header } from './components/Header'
@@ -8,27 +8,21 @@ import { WithdrawPanel } from './components/panels/WithdrawPanel'
 import { TransferPanel } from './components/panels/TransferPanel'
 import { TransactPanel } from './components/panels/TransactPanel'
 import { NotesPanel } from './components/panels/NotesPanel'
-import { initCircuits } from './lib/proof'
 
 type Tab = 'deposit' | 'withdraw' | 'transfer' | 'transact' | 'notes'
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('deposit')
   const wallet = useWallet()
-  const shieldNet = useShieldNet(wallet.account)
-
-  useEffect(() => {
-    initCircuits()
-  }, [])
+  const shieldNet = useShieldNet(wallet.wallet)
 
   const renderPanel = () => {
-    const props = { wallet, shieldNet }
     switch (activeTab) {
-      case 'deposit': return <DepositPanel {...props} />
-      case 'withdraw': return <WithdrawPanel {...props} />
-      case 'transfer': return <TransferPanel {...props} />
-      case 'transact': return <TransactPanel {...props} />
-      case 'notes': return <NotesPanel {...props} />
+      case 'deposit': return <DepositPanel wallet={wallet} shieldNet={shieldNet} />
+      case 'withdraw': return <WithdrawPanel wallet={wallet} shieldNet={shieldNet} />
+      case 'transfer': return <TransferPanel wallet={wallet} shieldNet={shieldNet} />
+      case 'transact': return <TransactPanel wallet={wallet} shieldNet={shieldNet} />
+      case 'notes': return <NotesPanel wallet={wallet} shieldNet={shieldNet} />
     }
   }
 

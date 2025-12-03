@@ -1,16 +1,31 @@
 import { useState } from 'react'
-import { Zap, Shield, ArrowRight } from 'lucide-react'
-import { formatUnits } from '../../lib/utils'
+import { Zap, Shield, ArrowRight, Loader2, AlertCircle, CheckCircle } from 'lucide-react'
+import { parseUnits, formatUnits } from '../../lib/utils'
 
 interface Props {
   wallet: { isConnected: boolean }
-  shieldNet: { getShieldedBalance: () => bigint }
+  shieldNet: {
+    transact: (amount: bigint, target: string, calldata: string[], minOutput: bigint) => Promise<string>
+    txState: { status: string; message: string; error?: string }
+    getShieldedBalance: () => bigint
+  }
 }
 
 export function TransactPanel({ wallet, shieldNet }: Props) {
   const [amount, setAmount] = useState('')
   const [target, setTarget] = useState('')
   const [minOutput, setMinOutput] = useState('')
+
+  const handleTransact = async () => {
+    if (!amount || !target) return
+    await shieldNet.transact(
+      parseUnits(amount, 18),
+      target,
+      [], // Empty calldata for now
+      parseUnits(minOutput || '0', 18)
+    )
+    setAmount('')
+  }
 
   if (!wallet.isConnected) {
     return (
@@ -20,6 +35,9 @@ export function TransactPanel({ wallet, shieldNet }: Props) {
       </div>
     )
   }
+
+  const { txState } = shieldNet
+  const isLoading = ['generating_witness', 'generating_proof', 'preparing_calldata', 'submitting'].includes(txState.status)
 
   return (
     <div className="space-y-6">
@@ -67,7 +85,7 @@ export function TransactPanel({ wallet, shieldNet }: Props) {
       </div>
 
       <div>
-        <label className="block text-sm text-slate-400 mb-2">Min Output</label>
+        <label className="block text-sm text-slate-400 mb-2">Min Output (slippage protection)</label>
         <input
           type="number"
           value={minOutput}
@@ -77,11 +95,25 @@ export function TransactPanel({ wallet, shieldNet }: Props) {
         />
       </div>
 
+      {txState.status !== 'idle' && (
+        <div className={`flex items-center gap-3 p-4 rounded-xl ${
+          txState.status === 'error' ? 'bg-red-500/10 text-red-400' :
+          txState.status === 'confirmed' ? 'bg-green-500/10 text-green-400' :
+          'bg-slate-800 text-white'
+        }`}>
+          {txState.status === 'error' && <AlertCircle className="w-5 h-5" />}
+          {txState.status === 'confirmed' && <CheckCircle className="w-5 h-5" />}
+          {isLoading && <Loader2 className="w-5 h-5 animate-spin" />}
+          <span>{txState.message}</span>
+        </div>
+      )}
+
       <button
-        disabled={!amount || !target}
+        onClick={handleTransact}
+        disabled={!amount || !target || isLoading}
         className="w-full py-4 rounded-xl bg-green-600 hover:bg-green-500 disabled:bg-slate-700 disabled:text-slate-500 font-semibold text-white"
       >
-        Execute Private DeFi
+        {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Execute Private DeFi'}
       </button>
 
       <p className="text-sm text-yellow-400/80 text-center">

@@ -1,15 +1,26 @@
 import { useState } from 'react'
-import { ArrowLeftRight, Shield } from 'lucide-react'
-import { formatUnits } from '../../lib/utils'
+import { ArrowLeftRight, Shield, Loader2, AlertCircle, CheckCircle } from 'lucide-react'
+import { parseUnits, formatUnits } from '../../lib/utils'
 
 interface Props {
   wallet: { isConnected: boolean }
-  shieldNet: { getShieldedBalance: () => bigint }
+  shieldNet: {
+    transfer: (amount: bigint, recipientPubKey: bigint) => Promise<string>
+    txState: { status: string; message: string; error?: string }
+    getShieldedBalance: () => bigint
+  }
 }
 
 export function TransferPanel({ wallet, shieldNet }: Props) {
   const [amount, setAmount] = useState('')
   const [recipientKey, setRecipientKey] = useState('')
+
+  const handleTransfer = async () => {
+    if (!amount || !recipientKey) return
+    await shieldNet.transfer(parseUnits(amount, 18), BigInt(recipientKey))
+    setAmount('')
+    setRecipientKey('')
+  }
 
   if (!wallet.isConnected) {
     return (
@@ -19,6 +30,9 @@ export function TransferPanel({ wallet, shieldNet }: Props) {
       </div>
     )
   }
+
+  const { txState } = shieldNet
+  const isLoading = ['generating_witness', 'generating_proof', 'preparing_calldata', 'submitting'].includes(txState.status)
 
   return (
     <div className="space-y-6">
@@ -47,7 +61,7 @@ export function TransferPanel({ wallet, shieldNet }: Props) {
       </div>
 
       <div>
-        <label className="block text-sm text-slate-400 mb-2">Recipient Public Key</label>
+        <label className="block text-sm text-slate-400 mb-2">Recipient ShieldNet Public Key</label>
         <input
           type="text"
           value={recipientKey}
@@ -57,11 +71,25 @@ export function TransferPanel({ wallet, shieldNet }: Props) {
         />
       </div>
 
+      {txState.status !== 'idle' && (
+        <div className={`flex items-center gap-3 p-4 rounded-xl ${
+          txState.status === 'error' ? 'bg-red-500/10 text-red-400' :
+          txState.status === 'confirmed' ? 'bg-green-500/10 text-green-400' :
+          'bg-slate-800 text-white'
+        }`}>
+          {txState.status === 'error' && <AlertCircle className="w-5 h-5" />}
+          {txState.status === 'confirmed' && <CheckCircle className="w-5 h-5" />}
+          {isLoading && <Loader2 className="w-5 h-5 animate-spin" />}
+          <span>{txState.message}</span>
+        </div>
+      )}
+
       <button
-        disabled={!amount || !recipientKey}
+        onClick={handleTransfer}
+        disabled={!amount || !recipientKey || isLoading}
         className="w-full py-4 rounded-xl bg-green-600 hover:bg-green-500 disabled:bg-slate-700 disabled:text-slate-500 font-semibold text-white"
       >
-        Transfer Privately
+        {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Transfer Privately'}
       </button>
     </div>
   )
