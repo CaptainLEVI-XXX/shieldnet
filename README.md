@@ -2,7 +2,7 @@
 
 ## Overview
 
-ShieldNet is a privacy-preserving protocol built on Starknet that enables anonymous token transfers and DeFi interactions using Zero-Knowledge (ZK) proofs. It implements a UTXO-like note system where users deposit tokens into a shielded pool and can later withdraw, transfer, or interact with DeFi protocols without revealing their identity.
+ShieldNet is a privacy-preserving protocol built on Starknet and Ztarknet that enables anonymous token transfers and DeFi interactions using Zero-Knowledge (ZK) proofs. It implements a UTXO-like note system where users deposit tokens into a shielded pool and can later withdraw, transfer, or interact with DeFi protocols without revealing their identity.
 
 ---
 
