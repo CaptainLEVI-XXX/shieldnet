@@ -62,9 +62,9 @@ async function declareAndDeployVerifier(directory: string) {
     constructorCalldata:{
         asset:"0x04718f5a0Fc34cC1AF16A1cdee98fFB20C31f5cD61D6Ab07201858f4287c938D",
         tree_depth:5,
-        transfer_verifier:"0x208601b7cb7e23a32d2856f1df1b272c054c08964558f5d104839f456ab090",
-        unshield_verifier:"0x7aa6b260fa830fee4b98cbf14d422ea9357f885026712f853a341b2f3c355c5",
-        transact_verifier:"0x506b6031b6f6a55ab4d417671d7f4051c42ce8c023f976b382d2e099a1087bc",
+        transfer_verifier:"0x329f2ba902c220ec8fe17485a5960aaacf45c3e5fafc61d0d30fd5c0c76519",
+        unshield_verifier:"0xfc8c288926c8eaf4bd364343e28d699f9373a781c3a4622216baeef6aeece8",
+        transact_verifier:"0x3c10cc5273b2faecc9dc77911324975b43ff9e927018dca6ff9663be7691ffd",
         owner: owner_account_address,
 
 

@@ -4,22 +4,25 @@ import { RpcProvider } from 'starknet'
 import { buildPoseidon } from 'circomlibjs'
 import { 
   Shield, Wallet, LogOut, Loader2, CheckCircle, AlertCircle, 
-  ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, Zap, 
-  Key, Copy, Check 
+  ArrowDownToLine, ArrowUpFromLine, Send, Key, Copy, Check,
+  Zap, Eye, EyeOff, RefreshCw, ExternalLink, Layers
 } from 'lucide-react'
+import { init } from 'garaga'
 
-import { init } from 'garaga';
-
-// ==================== CONFIGURATION ====================
-const SHIELD_POOL_ADDRESS = '0x6582ba9fe8f7d2aa18298c3f1803cf3e8e4efde5282bba8abac3606f12559ad' // UPDATE if changed
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+const SHIELD_POOL_ADDRESS = '0x42db592b9fc606a5a0297a88a2cd7cd74f213e832557ef1d2d786df6e6c824'
 const STRK_ADDRESS = '0x04718f5a0Fc34cC1AF16A1cdee98fFB20C31f5cD61D6Ab07201858f4287c938D'
-const RPC_URL = 'https://starknet-sepolia.infura.io/v3/44bdf2d1c8594cc9b16832398af754d7'
-const CIRCUIT_MERKLE_DEPTH = 2
-
-// Mask for 251 bits - matches circuit's mask_to_stark_field
+const RPC_URL = 'https://starknet-sepolia.infura.io/v3/'
+const RELAYER_URL = 'http://localhost:3001'
+const CIRCUIT_MERKLE_DEPTH = 5
 const MASK_251 = (1n << 251n) - 1n
+const STORAGE_VERSION = 'v4'
 
-// ==================== BN254 POSEIDON WITH MASKING ====================
+// ============================================================================
+// BN254 POSEIDON WITH MASKING
+// ============================================================================
 let poseidonInstance: any = null
 
 async function initPoseidon() {
@@ -33,38 +36,31 @@ function F2BigInt(poseidon: any, val: any): bigint {
   return BigInt(poseidon.F.toString(val))
 }
 
-// Mask to 251 bits - EXACTLY matches circuit's mask_to_stark_field
 function maskToStarkField(value: bigint): bigint {
   return value & MASK_251
 }
 
-// Raw BN254 hash (before masking)
 async function bn254HashRaw(inputs: bigint[]): Promise<bigint> {
   const poseidon = await initPoseidon()
   const hash = poseidon(inputs.map(x => x.toString()))
   return F2BigInt(poseidon, hash)
 }
 
-// Masked hash functions - match circuit's hash_2, hash_3, hash_4
 async function hash2(a: bigint, b: bigint): Promise<bigint> {
   const raw = await bn254HashRaw([a, b])
-  const masked = maskToStarkField(raw)
-  return masked
+  return maskToStarkField(raw)
 }
 
 async function hash3(a: bigint, b: bigint, c: bigint): Promise<bigint> {
   const raw = await bn254HashRaw([a, b, c])
-  const masked = maskToStarkField(raw)
-  return masked
+  return maskToStarkField(raw)
 }
 
 async function hash4(a: bigint, b: bigint, c: bigint, d: bigint): Promise<bigint> {
   const raw = await bn254HashRaw([a, b, c, d])
-  const masked = maskToStarkField(raw)
-  return masked
+  return maskToStarkField(raw)
 }
 
-// commitment = hash_4(amount, asset_id, blinding, owner_key) with masking
 async function computeCommitment(amount: bigint, assetId: bigint, blinding: bigint, ownerKey: bigint): Promise<bigint> {
   const commitment = await hash4(amount, assetId, blinding, ownerKey)
   console.log('computeCommitment:', {
@@ -77,7 +73,6 @@ async function computeCommitment(amount: bigint, assetId: bigint, blinding: bigi
   return commitment
 }
 
-// nullifier = hash_3(commitment, priv_key, index) with masking
 async function computeNullifier(commitment: bigint, privKey: bigint, index: bigint): Promise<bigint> {
   const nullifier = await hash3(commitment, privKey, index)
   console.log('computeNullifier:', {
@@ -96,17 +91,17 @@ function randomFieldElement(): bigint {
   for (const byte of bytes) {
     result = (result << 8n) | BigInt(byte)
   }
-  // Ensure fits in 251 bits
   return result & MASK_251
 }
 
 async function derivePublicKey(privKey: bigint): Promise<bigint> {
-  // pubkey = hash([privKey]) with masking
   const raw = await bn254HashRaw([privKey])
   return maskToStarkField(raw)
 }
 
-// ==================== MERKLE TREE ====================
+// ============================================================================
+// MERKLE TREE
+// ============================================================================
 class MerkleTree {
   depth: number
   leaves: bigint[]
@@ -123,7 +118,6 @@ class MerkleTree {
     if (this.initialized) return
     this.zeroValues = await this.computeZeroValues()
     this.initialized = true
-    console.log('MerkleTree initialized, zero values computed')
   }
   
   async computeZeroValues(): Promise<bigint[]> {
@@ -137,7 +131,6 @@ class MerkleTree {
   insert(leaf: bigint): number {
     const index = this.leaves.length
     this.leaves.push(leaf)
-    console.log(`Inserted leaf at index ${index}: ${toHex(leaf)}`)
     return index
   }
   
@@ -195,10 +188,9 @@ class MerkleTree {
   }
 }
 
-// ==================== STORAGE ====================
-// Using v4 to ensure fresh start with new masking
-const STORAGE_VERSION = 'v4'
-
+// ============================================================================
+// STORAGE
+// ============================================================================
 interface NoteData {
   amount: string
   assetId: string
@@ -233,7 +225,9 @@ function getOrCreatePrivateKey(): bigint {
   return newKey
 }
 
-// ==================== UTILS ====================
+// ============================================================================
+// UTILS
+// ============================================================================
 function parseUnits(value: string, decimals: number): bigint {
   if (!value) return 0n
   const [int = '0', frac = ''] = value.split('.')
@@ -255,7 +249,6 @@ function toHex(n: bigint): string {
   return '0x' + n.toString(16)
 }
 
-// ==================== PROOF GENERATION ====================
 function hexToUint8Array(hex: string): Uint8Array {
   const sanitised = BigInt(hex).toString(16).padStart(64, '0')
   const len = sanitised.length / 2
@@ -278,80 +271,9 @@ function flattenFieldsAsArray(fields: string[]): Uint8Array {
   return result
 }
 
-// async function generateProof(
-//   circuitName: string,
-//   inputs: Record<string, any>,
-//   onStatus: (msg: string) => void
-// ): Promise<{ calldata: bigint[] }> {
-//   onStatus('Loading proof system...')
-  
-//   const [
-//     { Noir },
-//     { UltraHonkBackend },
-//     { getZKHonkCallData, init: initGaraga },
-//     { default: initACVM },
-//     { default: initNoirC },
-//   ] = await Promise.all([
-//     import('@noir-lang/noir_js'),
-//     import('@aztec/bb.js'),
-//     import('garaga'),
-//     import('@noir-lang/acvm_js'),
-//     import('@noir-lang/noirc_abi'),
-//   ])
-  
-//   onStatus('Initializing WASM...')
-  
-//   try {
-//     await Promise.all([
-//       initACVM(new URL('@noir-lang/acvm_js/web/acvm_js_bg.wasm', import.meta.url)),
-//       initNoirC(new URL('@noir-lang/noirc_abi/web/noirc_abi_wasm_bg.wasm', import.meta.url)),
-//     ])
-//   } catch (e) {
-//     console.log('WASM init (may already be done)')
-//   }
-  
-//   await initGaraga()
-  
-//   onStatus('Loading circuit...')
-  
-//   const circuitRes = await fetch(`/circuits/${circuitName}.json`)
-//   if (!circuitRes.ok) throw new Error(`Circuit ${circuitName}.json not found`)
-//   const circuit = await circuitRes.json()
-  
-//   const vkRes = await fetch(`/circuits/${circuitName}_vk.bin`)
-//   if (!vkRes.ok) throw new Error(`VK ${circuitName}_vk.bin not found`)
-//   const vk = new Uint8Array(await vkRes.arrayBuffer())
-  
-//   onStatus('Generating witness...')
-  
-//   const noir = new Noir({
-//     bytecode: circuit.bytecode,
-//     abi: circuit.abi,
-//     debug_symbols: '',
-//     file_map: {} as any,
-//   })
-  
-//   console.log('Executing circuit with inputs:', inputs)
-//   const { witness } = await noir.execute(inputs)
-  
-//   onStatus('Generating ZK proof (30-60s)...')
-  
-//   const backend = new UltraHonkBackend(circuit.bytecode, { threads: 1 })
-//   const proof = await backend.generateProof(witness, { starknetZK: true })
-//   backend.destroy()
-  
-//   onStatus('Preparing calldata...')
-  
-//   const calldata = getZKHonkCallData(
-//     proof.proof,
-//     flattenFieldsAsArray(proof.publicInputs),
-//     vk,
-//     1
-//   )
-  
-//   return { calldata: calldata.slice(1) }
-// }
-
+// ============================================================================
+// PROOF GENERATION
+// ============================================================================
 async function generateProof(
   circuitName: string,
   inputs: Record<string, any>,
@@ -360,7 +282,6 @@ async function generateProof(
   onStatus('Loading proof system...')
   
   try {
-    // Import dependencies
     const [
       { Noir },
       { UltraHonkBackend },
@@ -375,11 +296,8 @@ async function generateProof(
       import('@noir-lang/noirc_abi'),
     ])
     
-    console.log('✅ Imports loaded')
-    
     onStatus('Initializing WASM...')
     
-    // Load circuit first to get paths
     const circuitRes = await fetch(`/circuits/${circuitName}.json`)
     if (!circuitRes.ok) throw new Error(`Circuit ${circuitName}.json not found`)
     const circuit = await circuitRes.json()
@@ -388,10 +306,6 @@ async function generateProof(
     if (!vkRes.ok) throw new Error(`VK ${circuitName}_vk.bin not found`)
     const vk = new Uint8Array(await vkRes.arrayBuffer())
     
-    console.log('✅ Circuit loaded, bytecode length:', circuit.bytecode.length)
-    console.log('✅ VK loaded, size:', vk.length)
-    
-    // Initialize WASM using fetch approach 
     const acvmUrl = new URL('@noir-lang/acvm_js/web/acvm_js_bg.wasm', import.meta.url).href
     const noircUrl = new URL('@noir-lang/noirc_abi/web/noirc_abi_wasm_bg.wasm', import.meta.url).href
     
@@ -400,15 +314,10 @@ async function generateProof(
       initNoirC(fetch(noircUrl)),
     ])
     
-    console.log('✅ WASM initialized')
-    
-    // Initialize Garaga
     await initGaraga()
-    console.log('✅ Garaga initialized')
     
     onStatus('Generating witness...')
     
-    // Create Noir instance
     const noir = new Noir({
       bytecode: circuit.bytecode,
       abi: circuit.abi as any,
@@ -416,45 +325,71 @@ async function generateProof(
       file_map: {} as any,
     })
     
-    console.log('Executing circuit with inputs...')
     const { witness } = await noir.execute(inputs)
-    console.log('✅ Witness generated, size:', witness.length)
     
-    onStatus('Generating ZK proof (this may take 2-3 minutes)...')
+    onStatus('Generating ZK proof (2-3 minutes)...')
     
-    // IMPORTANT: Use threads: 1 for browser environment
     const backend = new UltraHonkBackend(circuit.bytecode, { threads: 1 })
-    console.log('✅ Backend created')
-    
-    // Generate proof with timeout to prevent hanging
     const proof = await backend.generateProof(witness, { starknetZK: true })
-    console.log('✅ Proof generated, size:', proof.proof.length)
-    
     backend.destroy()
     
     onStatus('Preparing calldata...')
     
-    // Initialize Garaga again (as done in tutorial)
     await init()
     
     const calldata = getZKHonkCallData(
       proof.proof,
       flattenFieldsAsArray(proof.publicInputs),
       vk,
-      1 // HonkFlavor.STARKNET
+      1
     )
-    
-    console.log('✅ Calldata ready, length:', calldata.length)
     
     return { calldata: calldata.slice(1) }
     
   } catch (error: any) {
-    console.error('❌ Proof generation failed:', error)
     throw new Error(`Proof generation failed: ${error.message}`)
   }
 }
 
-// ==================== MAIN APP ====================
+// ============================================================================
+// RELAYER API
+// ============================================================================
+async function relayTransaction(
+  type: 'withdraw' | 'transfer',
+  calldata: string[],
+  publicInputs: Record<string, any>
+): Promise<string> {
+  const response = await fetch(`${RELAYER_URL}/relay`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type,
+      calldata,
+      public_inputs: publicInputs,
+    }),
+  })
+  
+  const data = await response.json()
+  
+  if (!response.ok) {
+    throw new Error(data.error || data.details || 'Relay failed')
+  }
+  
+  return data.txHash
+}
+
+async function checkRelayerHealth(): Promise<boolean> {
+  try {
+    const response = await fetch(`${RELAYER_URL}/health`)
+    return response.ok
+  } catch {
+    return false
+  }
+}
+
+// ============================================================================
+// MAIN APP
+// ============================================================================
 type Tab = 'deposit' | 'withdraw' | 'transfer' | 'transact' | 'notes'
 type Status = 'idle' | 'loading' | 'success' | 'error'
 
@@ -470,13 +405,15 @@ export default function App() {
   const [status, setStatus] = useState<Status>('idle')
   const [statusMsg, setStatusMsg] = useState('')
   const [txHash, setTxHash] = useState<string | null>(null)
+  const [relayerOnline, setRelayerOnline] = useState(false)
   
-  const [amount, setAmount] = useState('')
-  const [recipient, setRecipient] = useState('')
-  const [recipientKey, setRecipientKey] = useState('')
-  const [targetContract, setTargetContract] = useState('')
-  const [minOutput, setMinOutput] = useState('')
-  const [copied, setCopied] = useState(false)
+  const [depositAmount, setDepositAmount] = useState('')
+  const [withdrawAmount, setWithdrawAmount] = useState('')
+  const [withdrawRecipient, setWithdrawRecipient] = useState('')
+  const [transferAmount, setTransferAmount] = useState('')
+  const [transferRecipientKey, setTransferRecipientKey] = useState('')
+  const [showPrivateKey, setShowPrivateKey] = useState(false)
+  const [copied, setCopied] = useState<string | null>(null)
   
   const [publicKey, setPublicKey] = useState<bigint>(0n)
   const [isInitialized, setIsInitialized] = useState(false)
@@ -484,23 +421,14 @@ export default function App() {
   
   const merkleTreeRef = useRef<MerkleTree>(new MerkleTree(CIRCUIT_MERKLE_DEPTH))
   
-  // Initialize
   useEffect(() => {
-    async function init() {
-      console.log('=== INITIALIZING SHIELDNET ===')
-      console.log('Storage version:', STORAGE_VERSION)
-      
+    async function initApp() {
       await initPoseidon()
-      console.log('Poseidon initialized')
-      
       const pubKey = await derivePublicKey(privateKey)
       setPublicKey(pubKey)
-      console.log('Private key:', toHex(privateKey))
-      console.log('Public key:', toHex(pubKey))
       
       const loaded = loadNotes()
       setNotes(loaded)
-      console.log('Loaded', loaded.length, 'notes')
       
       const tree = new MerkleTree(CIRCUIT_MERKLE_DEPTH)
       await tree.init()
@@ -510,25 +438,29 @@ export default function App() {
       }
       merkleTreeRef.current = tree
       
-      if (loaded.length > 0) {
-        const root = await tree.getRoot()
-        console.log('Merkle root:', toHex(root))
-      }
+      const online = await checkRelayerHealth()
+      setRelayerOnline(online)
       
       setIsInitialized(true)
-      console.log('=== INITIALIZATION COMPLETE ===')
     }
-    init()
+    initApp()
   }, [privateKey])
+  
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const online = await checkRelayerHealth()
+      setRelayerOnline(online)
+    }, 10000)
+    return () => clearInterval(interval)
+  }, [])
   
   const unspentNotes = notes.filter(n => !n.spent)
   const shieldedBalance = unspentNotes.reduce((sum, n) => sum + BigInt(n.amount), 0n)
   
-  // ==================== WALLET ====================
   async function connectWallet() {
     try {
       setStatus('loading')
-      setStatusMsg('Connecting...')
+      setStatusMsg('Connecting wallet...')
       const starknet = await connect()
       if (!starknet) throw new Error('No wallet found')
       const accounts = await starknet.request({ type: 'wallet_requestAccounts' })
@@ -550,12 +482,11 @@ export default function App() {
     setIsConnected(false)
   }
   
-  // ==================== DEPOSIT ====================
   async function handleDeposit() {
     if (!walletObj || !address || !isInitialized) return
-    if (!amount || parseUnits(amount, 18) <= 0n) {
+    if (!depositAmount || parseUnits(depositAmount, 18) <= 0n) {
       setStatus('error')
-      setStatusMsg('Enter valid amount')
+      setStatusMsg('Enter a valid amount')
       return
     }
     
@@ -563,26 +494,16 @@ export default function App() {
       setStatus('loading')
       setStatusMsg('Computing commitment...')
       
-      const amountWei = parseUnits(amount, 18)
+      const amountWei = parseUnits(depositAmount, 18)
       const blinding = randomFieldElement()
       const assetId = BigInt(STRK_ADDRESS)
       
-      console.log('=== DEPOSIT ===')
-      console.log('Amount (wei):', amountWei.toString())
-      console.log('Amount (hex):', toHex(amountWei))
-      console.log('Asset ID:', toHex(assetId))
-      console.log('Blinding:', toHex(blinding))
-      console.log('Owner Key (pubKey):', toHex(publicKey))
-      
       const commitment = await computeCommitment(amountWei, assetId, blinding, privateKey)
-      console.log('Commitment:', toHex(commitment))
       
-      // Verify commitment fits in Starknet field
       const STARK_PRIME = BigInt('0x800000000000011000000000000000000000000000000000000000000000001')
       if (commitment >= STARK_PRIME) {
-        throw new Error('Commitment exceeds Starknet field - masking not working correctly')
+        throw new Error('Commitment exceeds Starknet field')
       }
-      console.log('Commitment fits in Starknet field: true')
       
       setStatusMsg('Preparing transaction...')
       
@@ -612,12 +533,6 @@ export default function App() {
       const leafIndex = merkleTreeRef.current.insert(commitment)
       const nullifier = await computeNullifier(commitment, privateKey, BigInt(leafIndex))
       
-      console.log('Leaf index:', leafIndex)
-      console.log('Nullifier:', toHex(nullifier))
-      
-      const newRoot = await merkleTreeRef.current.getRoot()
-      console.log('New merkle root:', toHex(newRoot))
-      
       const newNote: NoteData = {
         amount: amountWei.toString(),
         assetId: STRK_ADDRESS,
@@ -637,377 +552,262 @@ export default function App() {
       setTxHash(result.transaction_hash)
       setStatus('success')
       setStatusMsg('Deposit successful!')
-      setAmount('')
+      setDepositAmount('')
     } catch (err: any) {
-      console.error('Deposit error:', err)
       setStatus('error')
-      setStatusMsg(err.message || 'Failed')
+      setStatusMsg(err.message || 'Deposit failed')
     }
   }
-  
-  // ==================== WITHDRAW ====================
-  // async function handleWithdraw() {
-  //   if (!walletObj || !address || !isInitialized) return
-  //   if (!amount || !recipient) {
-  //     setStatus('error')
-  //     setStatusMsg('Enter amount and recipient')
-  //     return
-  //   }
-    
-  //   const amountWei = parseUnits(amount, 18)
-    
-  //   try {
-  //     setStatus('loading')
-  //     setStatusMsg('Selecting notes...')
-      
-  //     const selected: NoteData[] = []
-  //     let total = 0n
-  //     for (const note of unspentNotes) {
-  //       selected.push(note)
-  //       total += BigInt(note.amount)
-  //       if (total >= amountWei && selected.length <= 2) break
-  //     }
-      
-  //     if (total < amountWei) throw new Error('Insufficient balance')
-      
-  //     // Pad to 2 notes with dummy
-  //     while (selected.length < 2) {
-  //       const dummyBlinding = randomFieldElement()
-  //       const dummyCommitment = await computeCommitment(0n, BigInt(STRK_ADDRESS), dummyBlinding, publicKey)
-        
-  //       selected.push({
-  //         amount: '0',
-  //         assetId: STRK_ADDRESS,
-  //         blinding: dummyBlinding.toString(),
-  //         ownerKey: publicKey.toString(),
-  //         commitment: dummyCommitment.toString(),
-  //         nullifier: '0',
-  //         leafIndex: 0,
-  //         spent: false,
-  //         createdAt: Date.now(),
-  //       })
-  //     }
-      
-  //     setStatusMsg('Computing proofs...')
-      
-  //     // Change note
-  //     const changeAmount = total - amountWei
-  //     const changeBlinding = randomFieldElement()
-  //     const changeCommitment = await computeCommitment(changeAmount, BigInt(STRK_ADDRESS), changeBlinding, publicKey)
-      
-  //     // Get merkle proofs
-  //     const proof1 = await merkleTreeRef.current.getProof(selected[0].leafIndex)
-  //     const proof2 = await merkleTreeRef.current.getProof(selected[1].leafIndex)
-      
-  //     const merkleRoot = await merkleTreeRef.current.getRoot()
-      
-  //     // IMPORTANT: Circuit uses fixed indices 0 and 1, not leaf indices
-  //     const nullifier1 = await computeNullifier(BigInt(selected[0].commitment), privateKey, 0n)
-  //     const nullifier2 = BigInt(selected[1].amount) > 0n 
-  //       ? await computeNullifier(BigInt(selected[1].commitment), privateKey, 1n)
-  //       : 0n
-      
-  //     const recipientField = BigInt(recipient)
-      
-  //     console.log('=== WITHDRAW DEBUG ===')
-  //     console.log('Note 1:')
-  //     console.log('  Amount:', selected[0].amount)
-  //     console.log('  Asset:', selected[0].assetId)
-  //     console.log('  Blinding:', toHex(BigInt(selected[0].blinding)))
-  //     console.log('  OwnerKey:', toHex(BigInt(selected[0].ownerKey)))
-  //     console.log('  Commitment (stored):', toHex(BigInt(selected[0].commitment)))
-      
-  //     // Recompute commitment to verify
-  //     const recomputedCommitment1 = await computeCommitment(
-  //       BigInt(selected[0].amount),
-  //       BigInt(selected[0].assetId),
-  //       BigInt(selected[0].blinding),
-  //       BigInt(selected[0].ownerKey)
-  //     )
-  //     console.log('  Commitment (recomputed):', toHex(recomputedCommitment1))
-  //     console.log('  Commitments match:', recomputedCommitment1 === BigInt(selected[0].commitment))
-      
-  //     console.log('Note 2:')
-  //     console.log('  Amount:', selected[1].amount)
-  //     console.log('  Commitment:', toHex(BigInt(selected[1].commitment)))
-      
-  //     console.log('Merkle:')
-  //     console.log('  Root:', toHex(merkleRoot))
-  //     console.log('  PathBits[0]:', proof1.pathBits.slice(0, 5).map(b => b.toString()))
-  //     console.log('  Siblings[0] (first 3):', proof1.siblings.slice(0, 3).map(s => toHex(s)))
-      
-  //     // Verify merkle proof locally
-  //     console.log('=== LOCAL MERKLE VERIFICATION ===')
-  //     let current = BigInt(selected[0].commitment)
-  //     console.log('Starting leaf:', toHex(current))
-      
-  //     for (let i = 0; i < CIRCUIT_MERKLE_DEPTH; i++) {
-  //       const sibling = proof1.siblings[i]
-  //       const isRight = proof1.pathBits[i]
-        
-  //       let newCurrent: bigint
-  //       if (isRight === 1n) {
-  //         newCurrent = await hash2(sibling, current)
-  //       } else {
-  //         newCurrent = await hash2(current, sibling)
-  //       }
-        
-  //       if (i < 3) {
-  //         console.log(`Level ${i}: isRight=${isRight}, sibling=${toHex(sibling).slice(0, 20)}..., result=${toHex(newCurrent).slice(0, 20)}...`)
-  //       }
-  //       current = newCurrent
-  //     }
-  //     console.log('Computed root:', toHex(current))
-  //     console.log('Expected root:', toHex(merkleRoot))
-  //     console.log('Match:', current === merkleRoot)
-      
-  //     if (current !== merkleRoot) {
-  //       throw new Error('Local merkle verification failed - commitment or tree mismatch')
-  //     }
-      
-  //     // Build circuit inputs
-  //     const circuitInputs = {
-  //       in1_amount: toHex(BigInt(selected[0].amount)),
-  //       in1_asset_id: toHex(BigInt(selected[0].assetId)),
-  //       in1_blinding: toHex(BigInt(selected[0].blinding)),
-  //       in1_priv_key: toHex(privateKey),
-  //       in1_path: proof1.pathBits.map(b => toHex(b)),
-  //       in1_siblings: proof1.siblings.map(s => toHex(s)),
-        
-  //       in2_amount: toHex(BigInt(selected[1].amount)),
-  //       in2_asset_id: toHex(BigInt(selected[1].assetId)),
-  //       in2_blinding: toHex(BigInt(selected[1].blinding)),
-  //       in2_priv_key: toHex(privateKey),
-  //       in2_path: proof2.pathBits.map(b => toHex(b)),
-  //       in2_siblings: proof2.siblings.map(s => toHex(s)),
-        
-  //       change_amount: toHex(changeAmount),
-  //       change_blinding: toHex(changeBlinding),
-  //       change_pub_key: toHex(publicKey),
-        
-  //       merkle_root: toHex(merkleRoot),
-  //       nullifier_1: toHex(nullifier1),
-  //       nullifier_2: toHex(nullifier2),
-  //       change_commitment: toHex(changeCommitment),
-  //       recipient: toHex(recipientField),
-  //       withdraw_amount: toHex(amountWei),
-  //       relayer_fee: toHex(0n),
-  //     }
-      
-  //     console.log('=== CIRCUIT INPUTS ===')
-  //     console.log('in1_amount:', circuitInputs.in1_amount)
-  //     console.log('in1_asset_id:', circuitInputs.in1_asset_id)
-  //     console.log('in1_blinding:', circuitInputs.in1_blinding)
-  //     console.log('in1_priv_key:', circuitInputs.in1_priv_key)
-  //     console.log('merkle_root:', circuitInputs.merkle_root)
-      
-  //     setStatusMsg('Generating ZK proof...')
-  //     const proofResult = await generateProof('unshield', circuitInputs, setStatusMsg)
-      
-  //     setStatusMsg('Submitting transaction...')
-      
-  //     const calls = [{
-  //       contract_address: SHIELD_POOL_ADDRESS,
-  //       entry_point: 'withdraw',
-  //       calldata: [
-  //         proofResult.calldata.length.toString(),
-  //         ...proofResult.calldata.map(c => toHex(c)),
-  //         toHex(merkleRoot),
-  //         toHex(nullifier1),
-  //         toHex(nullifier2),
-  //         toHex(changeCommitment),
-  //         toHex(recipientField),
-  //         toHex(amountWei),
-  //         '0x0',
-  //         '0x0',
-  //         '0x0',
-  //         '0x0',
-  //       ],
-  //     }]
-      
-  //     setStatusMsg('Confirm in wallet...')
-      
-  //     const result = await walletObj.request({
-  //       type: 'wallet_addInvokeTransaction',
-  //       params: { calls },
-  //     })
-      
-  //     setStatusMsg('Waiting for confirmation...')
-  //     await provider.waitForTransaction(result.transaction_hash)
-      
-  //     let updated = notes.map(n => {
-  //       if (selected.some(s => s.commitment === n.commitment && s.leafIndex === n.leafIndex)) {
-  //         return { ...n, spent: true }
-  //       }
-  //       return n
-  //     })
-      
-  //     if (changeAmount > 0n) {
-  //       const changeLeafIndex = merkleTreeRef.current.insert(changeCommitment)
-  //       const changeNullifier = await computeNullifier(changeCommitment, privateKey, BigInt(changeLeafIndex))
-        
-  //       updated.push({
-  //         amount: changeAmount.toString(),
-  //         assetId: STRK_ADDRESS,
-  //         blinding: changeBlinding.toString(),
-  //         ownerKey: publicKey.toString(),
-  //         commitment: changeCommitment.toString(),
-  //         nullifier: changeNullifier.toString(),
-  //         leafIndex: changeLeafIndex,
-  //         spent: false,
-  //         createdAt: Date.now(),
-  //       })
-  //     }
-      
-  //     saveNotes(updated)
-  //     setNotes(updated)
-      
-  //     setTxHash(result.transaction_hash)
-  //     setStatus('success')
-  //     setStatusMsg('Withdrawal successful!')
-  //     setAmount('')
-  //     setRecipient('')
-  //   } catch (err: any) {
-  //     console.error('Withdraw error:', err)
-  //     setStatus('error')
-  //     setStatusMsg(err.message || 'Failed')
-  //   }
-  // }
 
   async function handleWithdraw() {
-  if (!walletObj || !address || !isInitialized) return
-  if (!amount || !recipient) {
-    setStatus('error')
-    setStatusMsg('Enter amount and recipient')
-    return
-  }
-  
-  const amountWei = parseUnits(amount, 18)
-  
-  try {
-    setStatus('loading')
-    setStatusMsg('Selecting note...')
-    
-    const selectedNote = unspentNotes.find(n => BigInt(n.amount) >= amountWei)
-    if (!selectedNote) throw new Error('No note with sufficient balance')
-    
-    const changeAmount = BigInt(selectedNote.amount) - amountWei
-    const changeBlinding = randomFieldElement()
-    const changeCommitment = await computeCommitment(
-      changeAmount, 
-      BigInt(STRK_ADDRESS), 
-      changeBlinding, 
-      publicKey
-    )
-    
-    const proof = await merkleTreeRef.current.getProof(selectedNote.leafIndex)
-    const merkleRoot = await merkleTreeRef.current.getRoot()
-    const nullifier = await computeNullifier(BigInt(selectedNote.commitment), privateKey, 0n)
-    
-    const circuitInputs = {
-      in_amount: toHex(BigInt(selectedNote.amount)),
-      in_asset_id: toHex(BigInt(selectedNote.assetId)),
-      in_blinding: toHex(BigInt(selectedNote.blinding)),
-      in_priv_key: toHex(privateKey),
-      in_path: proof.pathBits.map(b => toHex(b)),
-      in_siblings: proof.siblings.map(s => toHex(s)),
-      change_amount: toHex(changeAmount),
-      change_blinding: toHex(changeBlinding),
-      change_pub_key: toHex(publicKey),
-      merkle_root: toHex(merkleRoot),
-      nullifier: toHex(nullifier),
-      change_commitment: toHex(changeCommitment),
-      recipient: toHex(BigInt(recipient)),
-      withdraw_amount: toHex(amountWei),
+    if (!isInitialized) return
+    if (!withdrawAmount || !withdrawRecipient) {
+      setStatus('error')
+      setStatusMsg('Enter amount and recipient')
+      return
     }
     
-    // Log for CLI testing
-    console.log('=== PROVER.TOML ===')
-    Object.entries(circuitInputs).forEach(([k, v]) => {
-      if (Array.isArray(v)) {
-        console.log(`${k} = [${v.map(x => `"${x}"`).join(', ')}]`)
-      } else {
-        console.log(`${k} = "${v}"`)
+    if (!relayerOnline) {
+      setStatus('error')
+      setStatusMsg('Relayer is offline')
+      return
+    }
+    
+    const amountWei = parseUnits(withdrawAmount, 18)
+    
+    try {
+      setStatus('loading')
+      setStatusMsg('Selecting note...')
+      
+      const selectedNote = unspentNotes.find(n => BigInt(n.amount) >= amountWei)
+      if (!selectedNote) throw new Error('No note with sufficient balance')
+      
+      const changeAmount = BigInt(selectedNote.amount) - amountWei
+      const changeBlinding = randomFieldElement()
+      
+      const changeCommitment = await computeCommitment(
+        changeAmount, 
+        BigInt(STRK_ADDRESS), 
+        changeBlinding, 
+        publicKey
+      )
+      
+      const proof = await merkleTreeRef.current.getProof(selectedNote.leafIndex)
+      const merkleRoot = await merkleTreeRef.current.getRoot()
+      const nullifier = await computeNullifier(BigInt(selectedNote.commitment), privateKey, 0n)
+      
+      const circuitInputs = {
+        in_amount: toHex(BigInt(selectedNote.amount)),
+        in_asset_id: toHex(BigInt(selectedNote.assetId)),
+        in_blinding: toHex(BigInt(selectedNote.blinding)),
+        in_priv_key: toHex(privateKey),
+        in_path: proof.pathBits.map(b => toHex(b)),
+        in_siblings: proof.siblings.map(s => toHex(s)),
+        change_amount: toHex(changeAmount),
+        change_blinding: toHex(changeBlinding),
+        change_pub_key: toHex(publicKey),
+        merkle_root: toHex(merkleRoot),
+        nullifier: toHex(nullifier),
+        change_commitment: toHex(changeCommitment),
+        recipient: toHex(BigInt(withdrawRecipient)),
+        withdraw_amount: toHex(amountWei),
+        relayer_fee: toHex(0n),
       }
-    })
-    console.log('=== END ===')
-    
-    setStatusMsg('Generating ZK proof...')
-    const proofResult = await generateProof('unshield', circuitInputs, setStatusMsg)
-    
-    const calls = [{
-      contract_address: SHIELD_POOL_ADDRESS,
-      entry_point: 'withdraw',
-      calldata: [
+      
+      setStatusMsg('Generating ZK proof...')
+      const proofResult = await generateProof('unshield', circuitInputs, setStatusMsg)
+      
+      const amountLow = (amountWei & ((1n << 128n) - 1n)).toString()
+      const amountHigh = (amountWei >> 128n).toString()
+      
+      const calldata = [
         proofResult.calldata.length.toString(),
-        ...proofResult.calldata.map(c => toHex(c)),
+        ...proofResult.calldata.map(x => x.toString()),
         toHex(merkleRoot),
         toHex(nullifier),
         toHex(changeCommitment),
-        toHex(BigInt(recipient)),
-        toHex(amountWei),
-      ],
-    }]
-    
-    setStatusMsg('Confirm in wallet...')
-    const result = await walletObj.request({
-      type: 'wallet_addInvokeTransaction',
-      params: { calls },
-    })
-    
-    await provider.waitForTransaction(result.transaction_hash)
-    
-    // Update notes
-    let updated = notes.map(n => 
-      n.commitment === selectedNote.commitment ? { ...n, spent: true } : n
-    )
-    
-    if (changeAmount > 0n) {
-      const changeLeafIndex = merkleTreeRef.current.insert(changeCommitment)
-      const changeNullifier = await computeNullifier(changeCommitment, privateKey, BigInt(changeLeafIndex))
-      updated.push({
-        amount: changeAmount.toString(),
-        assetId: STRK_ADDRESS,
-        blinding: changeBlinding.toString(),
-        ownerKey: publicKey.toString(),
-        commitment: changeCommitment.toString(),
-        nullifier: changeNullifier.toString(),
-        leafIndex: changeLeafIndex,
-        spent: false,
-        createdAt: Date.now(),
+        withdrawRecipient,
+        amountLow,
+        amountHigh,
+        '0x0',
+        '0', '0',
+      ]
+      
+      setStatusMsg('Sending to relayer...')
+      
+      const finalTxHash = await relayTransaction('withdraw', calldata, {
+        merkle_root: toHex(merkleRoot),
+        nullifier: toHex(nullifier),
+        change_commitment: toHex(changeCommitment),
+        recipient: withdrawRecipient,
+        amount_low: amountLow,
+        amount_high: amountHigh,
       })
+      
+      let updated = notes.map(n => 
+        n.commitment === selectedNote.commitment ? { ...n, spent: true } : n
+      )
+      
+      if (changeAmount > 0n) {
+        const changeLeafIndex = merkleTreeRef.current.insert(changeCommitment)
+        const changeNullifier = await computeNullifier(changeCommitment, privateKey, BigInt(changeLeafIndex))
+        updated.push({
+          amount: changeAmount.toString(),
+          assetId: STRK_ADDRESS,
+          blinding: changeBlinding.toString(),
+          ownerKey: publicKey.toString(),
+          commitment: changeCommitment.toString(),
+          nullifier: changeNullifier.toString(),
+          leafIndex: changeLeafIndex,
+          spent: false,
+          createdAt: Date.now(),
+        })
+      }
+      
+      saveNotes(updated)
+      setNotes(updated)
+      setTxHash(finalTxHash)
+      setStatus('success')
+      setStatusMsg('Withdrawal successful!')
+      setWithdrawAmount('')
+      setWithdrawRecipient('')
+    } catch (err: any) {
+      setStatus('error')
+      setStatusMsg(err.message || 'Withdrawal failed')
+    }
+  }
+
+  async function handleTransfer() {
+    if (!isInitialized) return
+    if (!transferAmount || !transferRecipientKey) {
+      setStatus('error')
+      setStatusMsg('Enter amount and recipient public key')
+      return
     }
     
-    saveNotes(updated)
-    setNotes(updated)
-    setTxHash(result.transaction_hash)
-    setStatus('success')
-    setStatusMsg('Withdrawal successful!')
-    setAmount('')
-    setRecipient('')
-  } catch (err: any) {
-    console.error('Withdraw error:', err)
-    setStatus('error')
-    setStatusMsg(err.message || 'Failed')
+    if (!relayerOnline) {
+      setStatus('error')
+      setStatusMsg('Relayer is offline')
+      return
+    }
+    
+    const amountWei = parseUnits(transferAmount, 18)
+    
+    try {
+      setStatus('loading')
+      setStatusMsg('Selecting note...')
+      
+      const selectedNote = unspentNotes.find(n => BigInt(n.amount) >= amountWei)
+      if (!selectedNote) throw new Error('No note with sufficient balance')
+      
+      const changeAmount = BigInt(selectedNote.amount) - amountWei
+      
+      const out1Blinding = randomFieldElement()
+      const out1PubKey = BigInt(transferRecipientKey)
+      const commitment1 = await computeCommitment(amountWei, BigInt(STRK_ADDRESS), out1Blinding, out1PubKey)
+      
+      const out2Blinding = randomFieldElement()
+      const commitment2 = changeAmount > 0n
+        ? await computeCommitment(changeAmount, BigInt(STRK_ADDRESS), out2Blinding, publicKey)
+        : 0n
+      
+      const proof = await merkleTreeRef.current.getProof(selectedNote.leafIndex)
+      const merkleRoot = await merkleTreeRef.current.getRoot()
+      const nullifier = await computeNullifier(BigInt(selectedNote.commitment), privateKey, 0n)
+      
+      const circuitInputs = {
+        in_amount: toHex(BigInt(selectedNote.amount)),
+        in_asset_id: toHex(BigInt(selectedNote.assetId)),
+        in_blinding: toHex(BigInt(selectedNote.blinding)),
+        in_priv_key: toHex(privateKey),
+        in_path: proof.pathBits.map(b => toHex(b)),
+        in_siblings: proof.siblings.map(s => toHex(s)),
+        out1_amount: toHex(amountWei),
+        out1_blinding: toHex(out1Blinding),
+        out1_pub_key: toHex(out1PubKey),
+        out2_amount: toHex(changeAmount),
+        out2_blinding: toHex(out2Blinding),
+        out2_pub_key: toHex(publicKey),
+        merkle_root: toHex(merkleRoot),
+        nullifier: toHex(nullifier),
+        commitment_1: toHex(commitment1),
+        commitment_2: toHex(commitment2),
+        relayer_fee: toHex(0n),
+      }
+      
+      setStatusMsg('Generating ZK proof...')
+      const proofResult = await generateProof('transfer', circuitInputs, setStatusMsg)
+      
+      const encryptedNote1 = [toHex(commitment1), toHex(out1Blinding), toHex(amountWei)]
+      const encryptedNote2 = changeAmount > 0n 
+        ? [toHex(commitment2), toHex(out2Blinding), toHex(changeAmount)]
+        : []
+      
+      const calldata = [
+        proofResult.calldata.length.toString(),
+        ...proofResult.calldata.map(x => x.toString()),
+        toHex(merkleRoot),
+        toHex(nullifier),
+        toHex(commitment1),
+        toHex(commitment2),
+        '0x0',
+        '0', '0',
+        encryptedNote1.length.toString(),
+        ...encryptedNote1,
+        encryptedNote2.length.toString(),
+        ...encryptedNote2,
+      ]
+      
+      setStatusMsg('Sending to relayer...')
+      
+      const finalTxHash = await relayTransaction('transfer', calldata, {
+        merkle_root: toHex(merkleRoot),
+        nullifier: toHex(nullifier),
+        commitment_1: toHex(commitment1),
+        commitment_2: toHex(commitment2),
+        encrypted_note_1: encryptedNote1,
+        encrypted_note_2: encryptedNote2,
+      })
+      
+      let updated = notes.map(n => 
+        n.commitment === selectedNote.commitment ? { ...n, spent: true } : n
+      )
+      
+      merkleTreeRef.current.insert(commitment1)
+      
+      if (changeAmount > 0n) {
+        const changeLeafIndex = merkleTreeRef.current.insert(commitment2)
+        const changeNullifier = await computeNullifier(commitment2, privateKey, BigInt(changeLeafIndex))
+        updated.push({
+          amount: changeAmount.toString(),
+          assetId: STRK_ADDRESS,
+          blinding: out2Blinding.toString(),
+          ownerKey: publicKey.toString(),
+          commitment: commitment2.toString(),
+          nullifier: changeNullifier.toString(),
+          leafIndex: changeLeafIndex,
+          spent: false,
+          createdAt: Date.now(),
+        })
+      }
+      
+      saveNotes(updated)
+      setNotes(updated)
+      setTxHash(finalTxHash)
+      setStatus('success')
+      setStatusMsg('Transfer successful!')
+      setTransferAmount('')
+      setTransferRecipientKey('')
+    } catch (err: any) {
+      setStatus('error')
+      setStatusMsg(err.message || 'Transfer failed')
+    }
   }
-}
   
-  // ==================== TRANSFER & TRANSACT (placeholders) ====================
-  async function handleTransfer() {
-    setStatus('error')
-    setStatusMsg('Transfer not implemented yet')
-  }
-  
-  async function handleTransact() {
-    setStatus('error')
-    setStatusMsg('Transact not implemented yet')
-  }
-  
-  // ==================== UI ====================
-  function copyPublicKey() {
-    navigator.clipboard.writeText(toHex(publicKey))
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  function copyToClipboard(text: string, key: string) {
+    navigator.clipboard.writeText(text)
+    setCopied(key)
+    setTimeout(() => setCopied(null), 2000)
   }
   
   function resetStatus() {
@@ -1016,243 +816,770 @@ export default function App() {
     setTxHash(null)
   }
   
-  // Clear all data (for debugging)
   function clearAllData() {
-    localStorage.removeItem(`shieldnet_notes_${STORAGE_VERSION}`)
-    localStorage.removeItem(`shieldnet_privkey_${STORAGE_VERSION}`)
-    window.location.reload()
+    if (confirm('This will delete all your notes and private key. Are you sure?')) {
+      localStorage.removeItem(`shieldnet_notes_${STORAGE_VERSION}`)
+      localStorage.removeItem(`shieldnet_privkey_${STORAGE_VERSION}`)
+      window.location.reload()
+    }
   }
   
   const isLoading = status === 'loading'
+
+  // Colors
+  const colors = {
+    bg: '#0f172a',
+    card: '#1e293b',
+    cardBorder: '#334155',
+    primary: '#10b981',
+    primaryHover: '#34d399',
+    secondary: '#3b82f6',
+    purple: '#8b5cf6',
+    orange: '#f59e0b',
+    red: '#ef4444',
+    textWhite: '#ffffff',
+    textLight: '#e2e8f0',
+    textMuted: '#94a3b8',
+    inputBg: '#0f172a',
+  }
   
   return (
-    <div className="min-h-screen p-4">
-      <header className="max-w-2xl mx-auto flex items-center justify-between py-4 border-b border-slate-700">
-        <div className="flex items-center gap-2">
-          <Shield className="w-8 h-8 text-green-500" />
-          <span className="text-xl font-bold">ShieldNet</span>
+    <div style={{ 
+      minHeight: '100vh', 
+      backgroundColor: colors.bg,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      padding: '0',
+      margin: '0',
+    }}>
+      {/* Header */}
+      <header style={{ 
+        width: '100%',
+        maxWidth: '480px',
+        padding: '16px 20px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        borderBottom: `1px solid ${colors.cardBorder}`,
+        boxSizing: 'border-box',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ 
+            width: '36px', 
+            height: '36px', 
+            backgroundColor: colors.primary, 
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <Shield style={{ width: '20px', height: '20px', color: colors.textWhite }} />
+          </div>
+          <span style={{ fontSize: '18px', fontWeight: '700', color: colors.textWhite }}>ShieldNet</span>
         </div>
         
-        {isConnected && address ? (
-          <div className="flex items-center gap-3">
-            <span className="px-3 py-2 bg-slate-800 rounded-lg text-sm font-mono">
-              {truncateAddress(address)}
-            </span>
-            <button onClick={disconnectWallet} className="p-2 bg-slate-800 rounded-lg hover:bg-slate-700">
-              <LogOut className="w-5 h-5" />
-            </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px',
+            padding: '6px 10px',
+            backgroundColor: colors.card,
+            borderRadius: '6px',
+            border: `1px solid ${colors.cardBorder}`
+          }}>
+            <div style={{ 
+              width: '8px', 
+              height: '8px', 
+              borderRadius: '50%', 
+              backgroundColor: relayerOnline ? colors.primary : colors.red 
+            }} />
+            <span style={{ fontSize: '12px', color: colors.textMuted }}>Relayer</span>
           </div>
-        ) : (
-          <button
-            onClick={connectWallet}
-            disabled={isLoading || !isInitialized}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 rounded-lg hover:bg-green-500 font-medium disabled:opacity-50"
-          >
-            <Wallet className="w-5 h-5" />
-            {isInitialized ? 'Connect' : 'Loading...'}
-          </button>
-        )}
+          
+          {isConnected && address ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ 
+                padding: '6px 10px',
+                backgroundColor: colors.card,
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontFamily: 'monospace',
+                color: colors.textWhite,
+                border: `1px solid ${colors.cardBorder}`
+              }}>
+                {truncateAddress(address)}
+              </span>
+              <button 
+                onClick={disconnectWallet}
+                style={{ 
+                  padding: '6px',
+                  backgroundColor: colors.card,
+                  border: `1px solid ${colors.cardBorder}`,
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <LogOut style={{ width: '16px', height: '16px', color: colors.red }} />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={connectWallet}
+              disabled={isLoading || !isInitialized}
+              style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                backgroundColor: colors.primary,
+                color: colors.textWhite,
+                border: 'none',
+                borderRadius: '6px',
+                fontWeight: '600',
+                fontSize: '13px',
+                cursor: 'pointer',
+                opacity: (isLoading || !isInitialized) ? 0.5 : 1
+              }}
+            >
+              <Wallet style={{ width: '16px', height: '16px' }} />
+              {isInitialized ? 'Connect' : 'Loading...'}
+            </button>
+          )}
+        </div>
       </header>
       
-      <main className="max-w-2xl mx-auto py-8">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-green-400 to-green-600 bg-clip-text text-transparent">
-            ShieldNet
-          </h1>
-          <p className="text-slate-400">Private transactions on Starknet</p>
+      {/* Main Content */}
+      <main style={{ 
+        width: '100%',
+        maxWidth: '480px',
+        padding: '20px',
+        boxSizing: 'border-box',
+      }}>
+        {/* Balance Card */}
+        <div style={{ 
+          padding: '20px',
+          backgroundColor: `${colors.primary}15`,
+          border: `1px solid ${colors.primary}40`,
+          borderRadius: '12px',
+          marginBottom: '20px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            <Shield style={{ width: '18px', height: '18px', color: colors.primary }} />
+            <span style={{ fontSize: '14px', color: colors.primary, fontWeight: '500' }}>Shielded Balance</span>
+          </div>
+          <p style={{ fontSize: '28px', fontWeight: '700', color: colors.textWhite, margin: '0 0 4px 0' }}>
+            {formatUnits(shieldedBalance, 18)} <span style={{ fontSize: '16px', color: colors.textMuted }}>STRK</span>
+          </p>
+          <p style={{ fontSize: '13px', color: colors.textMuted, margin: 0 }}>{unspentNotes.length} notes available</p>
         </div>
         
-        <div className="flex gap-1 bg-slate-800 p-1 rounded-xl mb-6">
-          {[
+        {/* Tabs */}
+        <div style={{ 
+          display: 'flex',
+          gap: '4px',
+          padding: '4px',
+          backgroundColor: colors.card,
+          borderRadius: '10px',
+          marginBottom: '20px',
+          border: `1px solid ${colors.cardBorder}`
+        }}>
+          {([
             { id: 'deposit', label: 'Shield', icon: ArrowDownToLine },
             { id: 'withdraw', label: 'Unshield', icon: ArrowUpFromLine },
-            { id: 'transfer', label: 'Transfer', icon: ArrowLeftRight },
-            { id: 'transact', label: 'Transact', icon: Zap },
+            { id: 'transfer', label: 'Transfer', icon: Send },
+            { id: 'transact', label: 'Transact', icon: Layers },
             { id: 'notes', label: 'Notes', icon: Wallet },
-          ].map(tab => {
+          ] as const).map(tab => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
             return (
               <button
                 key={tab.id}
-                onClick={() => { setActiveTab(tab.id as Tab); resetStatus() }}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition ${
-                  isActive ? 'bg-green-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'
-                }`}
+                onClick={() => { setActiveTab(tab.id); resetStatus() }}
+                style={{ 
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px',
+                  padding: '10px 4px',
+                  backgroundColor: isActive ? colors.primary : 'transparent',
+                  color: isActive ? colors.textWhite : colors.textMuted,
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
               >
-                <Icon className="w-4 h-4" />
-                <span className="hidden sm:inline">{tab.label}</span>
+                <Icon style={{ width: '14px', height: '14px' }} />
+                <span style={{ display: 'none' }}>{tab.label}</span>
               </button>
             )
           })}
         </div>
         
+        {/* Status Message */}
         {status !== 'idle' && (
-          <div className={`mb-6 flex items-center gap-3 p-4 rounded-xl ${
-            status === 'error' ? 'bg-red-500/10 text-red-400' :
-            status === 'success' ? 'bg-green-500/10 text-green-400' :
-            'bg-slate-800'
-          }`}>
-            {isLoading && <Loader2 className="w-5 h-5 animate-spin" />}
-            {status === 'success' && <CheckCircle className="w-5 h-5" />}
-            {status === 'error' && <AlertCircle className="w-5 h-5" />}
-            <span className="flex-1">{statusMsg}</span>
+          <div style={{ 
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '12px',
+            backgroundColor: status === 'error' ? `${colors.red}20` : status === 'success' ? `${colors.primary}20` : `${colors.secondary}20`,
+            border: `1px solid ${status === 'error' ? `${colors.red}50` : status === 'success' ? `${colors.primary}50` : `${colors.secondary}50`}`,
+            borderRadius: '10px',
+            marginBottom: '16px'
+          }}>
+            {isLoading && <Loader2 style={{ width: '18px', height: '18px', color: colors.secondary, animation: 'spin 1s linear infinite' }} />}
+            {status === 'success' && <CheckCircle style={{ width: '18px', height: '18px', color: colors.primary }} />}
+            {status === 'error' && <AlertCircle style={{ width: '18px', height: '18px', color: colors.red }} />}
+            <span style={{ flex: 1, fontSize: '14px', color: status === 'error' ? colors.red : status === 'success' ? colors.primary : colors.secondary }}>
+              {statusMsg}
+            </span>
             {!isLoading && (
-              <button onClick={resetStatus} className="text-sm underline">Dismiss</button>
+              <button onClick={resetStatus} style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer', fontSize: '16px' }}>×</button>
             )}
           </div>
         )}
         
+        {/* Transaction Link */}
         {txHash && (
-          <div className="mb-6 text-sm text-slate-400 text-center">
-            Tx: <a href={`https://sepolia.starkscan.co/tx/${txHash}`} target="_blank" className="text-green-400 underline">
-              {truncateAddress(txHash)}
+          <div style={{ 
+            padding: '12px',
+            backgroundColor: colors.card,
+            borderRadius: '10px',
+            marginBottom: '16px',
+            border: `1px solid ${colors.cardBorder}`
+          }}>
+            <a
+              href={`https://sepolia.starkscan.co/tx/${txHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                color: colors.primary,
+                textDecoration: 'none',
+                fontSize: '14px'
+              }}
+            >
+              <span>View Transaction</span>
+              <ExternalLink style={{ width: '16px', height: '16px' }} />
             </a>
           </div>
         )}
         
-        <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6">
-          {!isConnected ? (
-            <div className="text-center py-12">
-              <Shield className="w-16 h-16 mx-auto mb-4 text-slate-600" />
-              <p className="text-slate-400">Connect wallet to continue</p>
+        {/* Main Card */}
+        <div style={{ 
+          backgroundColor: colors.card,
+          border: `1px solid ${colors.cardBorder}`,
+          borderRadius: '12px',
+          padding: '24px'
+        }}>
+          {/* DEPOSIT TAB */}
+          {activeTab === 'deposit' && (
+            <div>
+              <div style={{ textAlign: 'center', paddingBottom: '20px', borderBottom: `1px solid ${colors.cardBorder}`, marginBottom: '20px' }}>
+                <div style={{ 
+                  width: '50px', 
+                  height: '50px', 
+                  margin: '0 auto 12px',
+                  backgroundColor: `${colors.primary}20`,
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <ArrowDownToLine style={{ width: '24px', height: '24px', color: colors.primary }} />
+                </div>
+                <h2 style={{ fontSize: '18px', fontWeight: '600', color: colors.textWhite, margin: '0 0 4px' }}>Shield Tokens</h2>
+                <p style={{ fontSize: '14px', color: colors.textMuted, margin: 0 }}>Deposit STRK into privacy pool</p>
+              </div>
+              
+              {!isConnected ? (
+                <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                  <Wallet style={{ width: '40px', height: '40px', color: colors.textMuted, margin: '0 auto 12px' }} />
+                  <p style={{ color: colors.textMuted, fontSize: '14px' }}>Connect wallet to deposit</p>
+                </div>
+              ) : (
+                <>
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', fontSize: '14px', color: colors.textLight, marginBottom: '8px' }}>Amount (STRK)</label>
+                    <input
+                      type="number"
+                      value={depositAmount}
+                      onChange={e => setDepositAmount(e.target.value)}
+                      placeholder="0.0"
+                      disabled={isLoading}
+                      style={{ 
+                        width: '100%',
+                        padding: '14px',
+                        backgroundColor: colors.inputBg,
+                        border: `1px solid ${colors.cardBorder}`,
+                        borderRadius: '10px',
+                        color: colors.textWhite,
+                        fontSize: '16px',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                  
+                  <button
+                    onClick={handleDeposit}
+                    disabled={isLoading || !depositAmount}
+                    style={{ 
+                      width: '100%',
+                      padding: '14px',
+                      backgroundColor: (isLoading || !depositAmount) ? colors.cardBorder : colors.primary,
+                      color: colors.textWhite,
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      cursor: (isLoading || !depositAmount) ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {isLoading ? 'Processing...' : 'Shield Tokens'}
+                  </button>
+                </>
+              )}
             </div>
-          ) : activeTab === 'deposit' ? (
-            <div className="space-y-6">
-              <div className="text-center">
-                <ArrowDownToLine className="w-12 h-12 mx-auto mb-2 text-green-500" />
-                <h2 className="text-xl font-bold">Shield Tokens</h2>
-                <p className="text-slate-400 text-sm">Deposit STRK into the privacy pool</p>
+          )}
+          
+          {/* WITHDRAW TAB */}
+          {activeTab === 'withdraw' && (
+            <div>
+              <div style={{ textAlign: 'center', paddingBottom: '20px', borderBottom: `1px solid ${colors.cardBorder}`, marginBottom: '20px' }}>
+                <div style={{ 
+                  width: '50px', 
+                  height: '50px', 
+                  margin: '0 auto 12px',
+                  backgroundColor: `${colors.secondary}20`,
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <ArrowUpFromLine style={{ width: '24px', height: '24px', color: colors.secondary }} />
+                </div>
+                <h2 style={{ fontSize: '18px', fontWeight: '600', color: colors.textWhite, margin: '0 0 4px' }}>Unshield Tokens</h2>
+                <p style={{ fontSize: '14px', color: colors.textMuted, margin: 0 }}>Withdraw via relayer anonymously</p>
               </div>
               
-              <div className="bg-slate-900 rounded-xl p-4">
-                <div className="text-sm text-slate-400">Shielded Balance</div>
-                <div className="text-2xl font-bold text-green-400">{formatUnits(shieldedBalance, 18)} STRK</div>
-              </div>
+              {!relayerOnline && (
+                <div style={{ 
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '12px',
+                  backgroundColor: `${colors.orange}20`,
+                  border: `1px solid ${colors.orange}50`,
+                  borderRadius: '8px',
+                  marginBottom: '16px'
+                }}>
+                  <AlertCircle style={{ width: '18px', height: '18px', color: colors.orange }} />
+                  <span style={{ fontSize: '14px', color: colors.orange }}>Relayer offline</span>
+                </div>
+              )}
               
-              <div>
-                <label className="block text-sm text-slate-400 mb-2">Amount</label>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '14px', color: colors.textLight, marginBottom: '8px' }}>Amount (STRK)</label>
                 <input
                   type="number"
-                  value={amount}
-                  onChange={e => setAmount(e.target.value)}
+                  value={withdrawAmount}
+                  onChange={e => setWithdrawAmount(e.target.value)}
                   placeholder="0.0"
                   disabled={isLoading}
-                  className="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-lg focus:outline-none focus:border-green-500 disabled:opacity-50"
+                  style={{ 
+                    width: '100%',
+                    padding: '14px',
+                    backgroundColor: colors.inputBg,
+                    border: `1px solid ${colors.cardBorder}`,
+                    borderRadius: '10px',
+                    color: colors.textWhite,
+                    fontSize: '16px',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
                 />
               </div>
               
-              <button
-                onClick={handleDeposit}
-                disabled={isLoading || !amount}
-                className="w-full py-4 rounded-xl bg-green-600 hover:bg-green-500 disabled:bg-slate-700 disabled:text-slate-500 font-semibold"
-              >
-                {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Shield Tokens'}
-              </button>
-            </div>
-            
-          ) : activeTab === 'withdraw' ? (
-            <div className="space-y-6">
-              <div className="text-center">
-                <ArrowUpFromLine className="w-12 h-12 mx-auto mb-2 text-green-500" />
-                <h2 className="text-xl font-bold">Unshield Tokens</h2>
-                <p className="text-slate-400 text-sm">Withdraw to public address</p>
-              </div>
-              
-              <div className="bg-slate-900 rounded-xl p-4">
-                <div className="text-sm text-slate-400">Available</div>
-                <div className="text-2xl font-bold text-green-400">{formatUnits(shieldedBalance, 18)} STRK</div>
-                <div className="text-sm text-slate-500">{unspentNotes.length} notes</div>
-              </div>
-              
-              <div>
-                <label className="block text-sm text-slate-400 mb-2">Amount</label>
-                <input
-                  type="number"
-                  value={amount}
-                  onChange={e => setAmount(e.target.value)}
-                  placeholder="0.0"
-                  disabled={isLoading}
-                  className="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 focus:outline-none focus:border-green-500 disabled:opacity-50"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm text-slate-400 mb-2">Recipient Address</label>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '14px', color: colors.textLight, marginBottom: '8px' }}>Recipient Address</label>
                 <input
                   type="text"
-                  value={recipient}
-                  onChange={e => setRecipient(e.target.value)}
+                  value={withdrawRecipient}
+                  onChange={e => setWithdrawRecipient(e.target.value)}
                   placeholder="0x..."
                   disabled={isLoading}
-                  className="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 font-mono text-sm focus:outline-none focus:border-green-500 disabled:opacity-50"
+                  style={{ 
+                    width: '100%',
+                    padding: '14px',
+                    backgroundColor: colors.inputBg,
+                    border: `1px solid ${colors.cardBorder}`,
+                    borderRadius: '10px',
+                    color: colors.textWhite,
+                    fontSize: '14px',
+                    fontFamily: 'monospace',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
                 />
-                <button onClick={() => setRecipient(address || '')} className="text-sm text-green-500 mt-2">
-                  Use my address
-                </button>
+                {address && (
+                  <button 
+                    onClick={() => setWithdrawRecipient(address)}
+                    style={{ marginTop: '8px', background: 'none', border: 'none', color: colors.secondary, fontSize: '13px', cursor: 'pointer' }}
+                  >
+                    Use my address
+                  </button>
+                )}
               </div>
               
               <button
                 onClick={handleWithdraw}
-                disabled={isLoading || !amount || !recipient}
-                className="w-full py-4 rounded-xl bg-green-600 hover:bg-green-500 disabled:bg-slate-700 disabled:text-slate-500 font-semibold"
+                disabled={isLoading || !withdrawAmount || !withdrawRecipient || !relayerOnline}
+                style={{ 
+                  width: '100%',
+                  padding: '14px',
+                  backgroundColor: (isLoading || !withdrawAmount || !withdrawRecipient || !relayerOnline) ? colors.cardBorder : colors.secondary,
+                  color: colors.textWhite,
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  cursor: (isLoading || !withdrawAmount || !withdrawRecipient || !relayerOnline) ? 'not-allowed' : 'pointer'
+                }}
               >
-                {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Unshield Tokens'}
+                {isLoading ? 'Processing...' : 'Unshield Anonymously'}
               </button>
               
-              <p className="text-xs text-slate-500 text-center">⚠️ Proof generation takes 30-60 seconds</p>
+              <p style={{ textAlign: 'center', fontSize: '13px', color: colors.textMuted, marginTop: '16px' }}>
+                ⚡ Proof generation takes 2-3 minutes
+              </p>
             </div>
-            
-          ) : activeTab === 'notes' ? (
-            <div className="space-y-6">
-              <div className="text-center">
-                <Wallet className="w-12 h-12 mx-auto mb-2 text-green-500" />
-                <h2 className="text-xl font-bold">Your Notes</h2>
+          )}
+          
+          {/* TRANSFER TAB */}
+          {activeTab === 'transfer' && (
+            <div>
+              <div style={{ textAlign: 'center', paddingBottom: '20px', borderBottom: `1px solid ${colors.cardBorder}`, marginBottom: '20px' }}>
+                <div style={{ 
+                  width: '50px', 
+                  height: '50px', 
+                  margin: '0 auto 12px',
+                  backgroundColor: `${colors.purple}20`,
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Send style={{ width: '24px', height: '24px', color: colors.purple }} />
+                </div>
+                <h2 style={{ fontSize: '18px', fontWeight: '600', color: colors.textWhite, margin: '0 0 4px' }}>Private Transfer</h2>
+                <p style={{ fontSize: '14px', color: colors.textMuted, margin: 0 }}>Send shielded tokens anonymously</p>
               </div>
               
-              <div className="bg-slate-900 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2 text-sm text-slate-400">
-                    <Key className="w-4 h-4" />
-                    Your Public Key
+              {!relayerOnline && (
+                <div style={{ 
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '12px',
+                  backgroundColor: `${colors.orange}20`,
+                  border: `1px solid ${colors.orange}50`,
+                  borderRadius: '8px',
+                  marginBottom: '16px'
+                }}>
+                  <AlertCircle style={{ width: '18px', height: '18px', color: colors.orange }} />
+                  <span style={{ fontSize: '14px', color: colors.orange }}>Relayer offline</span>
+                </div>
+              )}
+              
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '14px', color: colors.textLight, marginBottom: '8px' }}>Amount (STRK)</label>
+                <input
+                  type="number"
+                  value={transferAmount}
+                  onChange={e => setTransferAmount(e.target.value)}
+                  placeholder="0.0"
+                  disabled={isLoading}
+                  style={{ 
+                    width: '100%',
+                    padding: '14px',
+                    backgroundColor: colors.inputBg,
+                    border: `1px solid ${colors.cardBorder}`,
+                    borderRadius: '10px',
+                    color: colors.textWhite,
+                    fontSize: '16px',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+              
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '14px', color: colors.textLight, marginBottom: '8px' }}>Recipient Public Key</label>
+                <input
+                  type="text"
+                  value={transferRecipientKey}
+                  onChange={e => setTransferRecipientKey(e.target.value)}
+                  placeholder="0x..."
+                  disabled={isLoading}
+                  style={{ 
+                    width: '100%',
+                    padding: '14px',
+                    backgroundColor: colors.inputBg,
+                    border: `1px solid ${colors.cardBorder}`,
+                    borderRadius: '10px',
+                    color: colors.textWhite,
+                    fontSize: '14px',
+                    fontFamily: 'monospace',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                <p style={{ fontSize: '12px', color: colors.textMuted, marginTop: '8px' }}>Get from recipient's Notes tab</p>
+              </div>
+              
+              <button
+                onClick={handleTransfer}
+                disabled={isLoading || !transferAmount || !transferRecipientKey || !relayerOnline}
+                style={{ 
+                  width: '100%',
+                  padding: '14px',
+                  backgroundColor: (isLoading || !transferAmount || !transferRecipientKey || !relayerOnline) ? colors.cardBorder : colors.purple,
+                  color: colors.textWhite,
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  cursor: (isLoading || !transferAmount || !transferRecipientKey || !relayerOnline) ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {isLoading ? 'Processing...' : 'Send Privately'}
+              </button>
+            </div>
+          )}
+          
+          {/* TRANSACT TAB */}
+          {activeTab === 'transact' && (
+            <div>
+              <div style={{ textAlign: 'center', paddingBottom: '20px', borderBottom: `1px solid ${colors.cardBorder}`, marginBottom: '20px' }}>
+                <div style={{ 
+                  width: '50px', 
+                  height: '50px', 
+                  margin: '0 auto 12px',
+                  backgroundColor: `${colors.orange}20`,
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Layers style={{ width: '24px', height: '24px', color: colors.orange }} />
+                </div>
+                <h2 style={{ fontSize: '18px', fontWeight: '600', color: colors.textWhite, margin: '0 0 4px' }}>Anonymous DeFi</h2>
+                <p style={{ fontSize: '14px', color: colors.textMuted, margin: 0 }}>Interact with protocols privately</p>
+              </div>
+              
+              <div style={{ textAlign: 'center', padding: '30px 0' }}>
+                <div style={{ 
+                  width: '60px', 
+                  height: '60px', 
+                  margin: '0 auto 16px',
+                  backgroundColor: `${colors.orange}15`,
+                  border: `1px solid ${colors.orange}30`,
+                  borderRadius: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Zap style={{ width: '30px', height: '30px', color: colors.orange }} />
+                </div>
+                <h3 style={{ fontSize: '16px', fontWeight: '600', color: colors.textWhite, margin: '0 0 8px' }}>Coming Soon</h3>
+                <p style={{ fontSize: '14px', color: colors.textMuted, maxWidth: '260px', margin: '0 auto' }}>
+                  Anonymous swaps, lending, and more DeFi protocols.
+                </p>
+                
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '16px', flexWrap: 'wrap' }}>
+                  {['zkLend', 'JediSwap', 'Nostra'].map(p => (
+                    <span key={p} style={{ 
+                      padding: '6px 12px',
+                      backgroundColor: colors.inputBg,
+                      border: `1px solid ${colors.cardBorder}`,
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      color: colors.textMuted
+                    }}>
+                      {p}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* NOTES TAB */}
+          {activeTab === 'notes' && (
+            <div>
+              <div style={{ textAlign: 'center', paddingBottom: '20px', borderBottom: `1px solid ${colors.cardBorder}`, marginBottom: '20px' }}>
+                <div style={{ 
+                  width: '50px', 
+                  height: '50px', 
+                  margin: '0 auto 12px',
+                  backgroundColor: `${colors.primary}20`,
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Wallet style={{ width: '24px', height: '24px', color: colors.primary }} />
+                </div>
+                <h2 style={{ fontSize: '18px', fontWeight: '600', color: colors.textWhite, margin: '0 0 4px' }}>My Notes</h2>
+                <p style={{ fontSize: '14px', color: colors.textMuted, margin: 0 }}>Manage keys and notes</p>
+              </div>
+              
+              {/* Public Key */}
+              <div style={{ 
+                backgroundColor: `${colors.primary}15`,
+                border: `1px solid ${colors.primary}40`,
+                borderRadius: '10px',
+                padding: '14px',
+                marginBottom: '14px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Key style={{ width: '14px', height: '14px', color: colors.primary }} />
+                    <span style={{ fontSize: '13px', color: colors.primary, fontWeight: '500' }}>Public Key</span>
                   </div>
-                  <button onClick={copyPublicKey} className="text-green-500">
-                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  <button 
+                    onClick={() => copyToClipboard(toHex(publicKey), 'pub')}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+                  >
+                    {copied === 'pub' ? <Check style={{ width: '14px', height: '14px', color: colors.primary }} /> : <Copy style={{ width: '14px', height: '14px', color: colors.primary }} />}
                   </button>
                 </div>
-                <div className="font-mono text-xs bg-slate-800 rounded p-2 break-all">
+                <p style={{ 
+                  fontFamily: 'monospace',
+                  fontSize: '11px',
+                  backgroundColor: colors.inputBg,
+                  borderRadius: '6px',
+                  padding: '10px',
+                  wordBreak: 'break-all',
+                  color: colors.textWhite,
+                  margin: 0
+                }}>
                   {toHex(publicKey)}
+                </p>
+                <p style={{ fontSize: '11px', color: colors.textMuted, marginTop: '6px' }}>Share to receive transfers</p>
+              </div>
+              
+              {/* Private Key */}
+              <div style={{ 
+                backgroundColor: `${colors.red}10`,
+                border: `1px solid ${colors.red}30`,
+                borderRadius: '10px',
+                padding: '14px',
+                marginBottom: '14px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Key style={{ width: '14px', height: '14px', color: colors.red }} />
+                    <span style={{ fontSize: '13px', color: colors.red, fontWeight: '500' }}>Private Key</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <button 
+                      onClick={() => setShowPrivateKey(!showPrivateKey)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+                    >
+                      {showPrivateKey ? <EyeOff style={{ width: '14px', height: '14px', color: colors.red }} /> : <Eye style={{ width: '14px', height: '14px', color: colors.red }} />}
+                    </button>
+                    {showPrivateKey && (
+                      <button 
+                        onClick={() => copyToClipboard(toHex(privateKey), 'priv')}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+                      >
+                        {copied === 'priv' ? <Check style={{ width: '14px', height: '14px', color: colors.red }} /> : <Copy style={{ width: '14px', height: '14px', color: colors.red }} />}
+                      </button>
+                    )}
+                  </div>
                 </div>
+                {showPrivateKey ? (
+                  <p style={{ 
+                    fontFamily: 'monospace',
+                    fontSize: '11px',
+                    backgroundColor: colors.inputBg,
+                    borderRadius: '6px',
+                    padding: '10px',
+                    wordBreak: 'break-all',
+                    color: colors.textWhite,
+                    margin: 0
+                  }}>
+                    {toHex(privateKey)}
+                  </p>
+                ) : (
+                  <p style={{ fontSize: '13px', color: colors.textMuted, margin: 0 }}>Click eye to reveal</p>
+                )}
+                <p style={{ fontSize: '11px', color: colors.red, marginTop: '6px' }}>⚠️ Never share this!</p>
               </div>
               
-              <div className="bg-gradient-to-r from-green-600/20 to-green-500/10 rounded-xl p-6 border border-green-500/30">
-                <div className="text-sm text-green-300">Total Shielded</div>
-                <div className="text-3xl font-bold">{formatUnits(shieldedBalance, 18)} STRK</div>
-              </div>
-              
+              {/* Notes List */}
               <div>
-                <h3 className="font-semibold mb-3">Notes ({unspentNotes.length} unspent)</h3>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: colors.textWhite, margin: 0 }}>Notes ({unspentNotes.length} available)</h3>
+                  <button 
+                    onClick={() => window.location.reload()}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+                  >
+                    <RefreshCw style={{ width: '14px', height: '14px', color: colors.textMuted }} />
+                  </button>
+                </div>
+                
                 {notes.length === 0 ? (
-                  <div className="text-center py-8 bg-slate-900 rounded-xl text-slate-400">
-                    No notes yet. Deposit to create your first note.
+                  <div style={{ textAlign: 'center', padding: '24px', backgroundColor: colors.inputBg, borderRadius: '10px' }}>
+                    <Wallet style={{ width: '28px', height: '28px', color: colors.textMuted, margin: '0 auto 8px' }} />
+                    <p style={{ fontSize: '13px', color: colors.textMuted, margin: 0 }}>No notes yet</p>
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                  <div style={{ maxHeight: '160px', overflowY: 'auto' }}>
                     {notes.map((note, i) => (
-                      <div key={i} className={`p-4 rounded-xl border ${
-                        note.spent ? 'bg-slate-900/50 border-slate-800 opacity-50' : 'bg-slate-900 border-slate-700'
-                      }`}>
-                        <div className="flex justify-between items-center">
-                          <span className="font-semibold">{formatUnits(BigInt(note.amount), 18)} STRK</span>
-                          <span className={`text-xs px-2 py-1 rounded ${
-                            note.spent ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'
-                          }`}>
+                      <div 
+                        key={i} 
+                        style={{ 
+                          padding: '12px',
+                          backgroundColor: note.spent ? colors.inputBg : colors.card,
+                          border: `1px solid ${colors.cardBorder}`,
+                          borderRadius: '8px',
+                          marginBottom: '8px',
+                          opacity: note.spent ? 0.5 : 1
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Shield style={{ width: '14px', height: '14px', color: note.spent ? colors.textMuted : colors.primary }} />
+                            <span style={{ fontSize: '14px', fontWeight: '600', color: colors.textWhite }}>{formatUnits(BigInt(note.amount), 18)} STRK</span>
+                          </div>
+                          <span style={{ 
+                            fontSize: '10px',
+                            padding: '3px 6px',
+                            backgroundColor: note.spent ? `${colors.red}20` : `${colors.primary}20`,
+                            color: note.spent ? colors.red : colors.primary,
+                            borderRadius: '4px'
+                          }}>
                             {note.spent ? 'Spent' : 'Available'}
                           </span>
                         </div>
-                        <div className="text-xs text-slate-500 mt-1">
-                          Index: {note.leafIndex} • {new Date(note.createdAt).toLocaleString()}
-                        </div>
+                        <p style={{ fontSize: '11px', color: colors.textMuted, marginTop: '6px' }}>
+                          Index: {note.leafIndex} • {new Date(note.createdAt).toLocaleDateString()}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -1261,20 +1588,43 @@ export default function App() {
               
               <button
                 onClick={clearAllData}
-                className="w-full py-2 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30 text-sm"
+                style={{ 
+                  width: '100%',
+                  marginTop: '14px',
+                  padding: '10px',
+                  backgroundColor: `${colors.red}15`,
+                  border: `1px solid ${colors.red}40`,
+                  borderRadius: '8px',
+                  color: colors.red,
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  cursor: 'pointer'
+                }}
               >
-                Clear All Data (Debug)
+                Clear All Data
               </button>
-            </div>
-          ) : (
-            <div className="text-center py-12 text-slate-400">
-              {activeTab === 'transfer' ? 'Transfer coming soon' : 'Transact coming soon'}
             </div>
           )}
         </div>
         
-        <p className="text-center text-slate-500 text-sm mt-6">Starknet Sepolia • Storage: {STORAGE_VERSION}</p>
+        {/* Footer */}
+        <p style={{ marginTop: '20px', fontSize: '12px', color: colors.textMuted, textAlign: 'center' }}>
+          Starknet Sepolia • v{STORAGE_VERSION}
+        </p>
       </main>
+      
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        input::placeholder {
+          color: #64748b;
+        }
+        * {
+          box-sizing: border-box;
+        }
+      `}</style>
     </div>
   )
 }
