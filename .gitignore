@@ -1,4 +1,5 @@
 scripts/.env
+relayer/.env
 node_modules
 verifier_transfer/target
 verifier_transact/target
